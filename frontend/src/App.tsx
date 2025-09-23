@@ -1,52 +1,56 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
+import { ConfigProvider, theme, App } from 'antd';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import ModernLogin from './components/Auth/ModernLogin';
-import ModernRegister from './components/Auth/ModernRegister';
-import ModernDashboard from './components/Dashboard/ModernDashboard';
+import Login from './components/Auth/Login';
+import Register from './components/Auth/Register';
+import Dashboard from './components/Dashboard/Dashboard';
 import ProjectDetail from './components/Project/ProjectDetail';
 
-const darkTheme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: {
-      main: '#8b5cf6',
-    },
-    secondary: {
-      main: '#06b6d4',
-    },
-    background: {
-      default: '#0f1419',
-      paper: 'rgba(30, 41, 59, 0.3)',
-    },
-    text: {
-      primary: 'rgba(255, 255, 255, 0.9)',
-      secondary: 'rgba(255, 255, 255, 0.6)',
-    },
+const { darkAlgorithm } = theme;
+
+const antdTheme = {
+  algorithm: darkAlgorithm,
+  token: {
+    colorPrimary: '#8b5cf6',
+    colorBgBase: '#0f1419',
+    colorBgContainer: 'rgba(30, 41, 59, 0.5)',
+    colorText: 'rgba(255, 255, 255, 0.9)',
+    colorTextSecondary: 'rgba(255, 255, 255, 0.6)',
+    borderRadius: 12,
+    colorBorder: 'rgba(255, 255, 255, 0.1)',
+    colorBgElevated: 'rgba(30, 41, 59, 0.8)',
   },
   components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-          borderRadius: '12px',
-        },
-      },
+    Layout: {
+      bodyBg: '#0f1419',
+      headerBg: 'rgba(30, 41, 59, 0.3)',
     },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          backgroundImage: 'none',
-        },
-      },
+    Card: {
+      colorBgContainer: 'rgba(30, 41, 59, 0.3)',
+    },
+    Button: {
+      colorPrimary: '#8b5cf6',
+      colorPrimaryHover: '#a855f7',
+      borderRadius: 8,
+    },
+    Input: {
+      colorBgContainer: 'rgba(30, 41, 59, 0.5)',
+      colorBorder: 'rgba(255, 255, 255, 0.2)',
+    },
+    Select: {
+      colorBgContainer: 'rgba(30, 41, 59, 0.5)',
+      colorBorder: 'rgba(255, 255, 255, 0.2)',
+    },
+    Table: {
+      colorBgContainer: 'rgba(30, 41, 59, 0.3)',
+      colorBorderSecondary: 'rgba(255, 255, 255, 0.1)',
+    },
+    Modal: {
+      contentBg: 'rgba(30, 41, 59, 0.9)',
     },
   },
-  typography: {
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  },
-});
+};
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
@@ -58,51 +62,52 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return token ? <Navigate to="/dashboard" /> : <>{children}</>;
 }
 
-function App() {
+function MainApp() {
   return (
-    <ThemeProvider theme={darkTheme}>
-      <CssBaseline />
-      <AuthProvider>
-        <Router>
-          <Routes>
-            <Route 
-              path="/login" 
-              element={
-                <PublicRoute>
-                  <ModernLogin />
-                </PublicRoute>
-              } 
-            />
-            <Route 
-              path="/register" 
-              element={
-                <PublicRoute>
-                  <ModernRegister />
-                </PublicRoute>
-              } 
-            />
-            <Route 
-              path="/dashboard" 
-              element={
-                <ProtectedRoute>
-                  <ModernDashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/projects/:projectId" 
-              element={
-                <ProtectedRoute>
-                  <ProjectDetail />
-                </ProtectedRoute>
-              } 
-            />
-            <Route path="/" element={<Navigate to="/dashboard" />} />
-          </Routes>
-        </Router>
-      </AuthProvider>
-    </ThemeProvider>
+    <ConfigProvider theme={antdTheme}>
+      <App>
+        <AuthProvider>
+          <Router>
+            <Routes>
+              <Route 
+                path="/login" 
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                } 
+              />
+              <Route 
+                path="/register" 
+                element={
+                  <PublicRoute>
+                    <Register />
+                  </PublicRoute>
+                } 
+              />
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/projects/:projectId" 
+                element={
+                  <ProtectedRoute>
+                    <ProjectDetail />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route path="/" element={<Navigate to="/dashboard" />} />
+            </Routes>
+          </Router>
+        </AuthProvider>
+      </App>
+    </ConfigProvider>
   );
 }
 
-export default App;
+export default MainApp;

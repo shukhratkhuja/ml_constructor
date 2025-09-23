@@ -1,35 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Button,
-  Typography,
-  ToggleButton,
-  ToggleButtonGroup,
-  TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Alert,
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Grid,
   Card,
-  Chip,
-} from '@mui/material';
-import { 
-  CloudUpload, 
-  Storage, 
-  Add, 
-  CheckCircle,
-  Description,
-  DataObject,
-  TableChart
-} from '@mui/icons-material';
+  Typography,
+  Button,
+  Switch,
+  Upload,
+  Select,
+  Form,
+  Input,
+  Row,
+  Col,
+  Space,
+  Modal,
+  Table,
+  Tag,
+  message,
+  Spin,
+  Alert,
+  Divider,
+} from 'antd';
+import {
+  CloudUploadOutlined,
+  DatabaseOutlined,
+  PlusOutlined,
+  CheckCircleOutlined,
+  FileTextOutlined,
+  TableOutlined,
+  FileExcelOutlined,
+  ApiOutlined,
+} from '@ant-design/icons';
+import { UploadFile, UploadProps } from 'antd/es/upload/interface';
 import axios from 'axios';
+
+const { Title, Text, Paragraph } = Typography;
+const { Dragger } = Upload;
+const { Option } = Select;
 
 interface DataLoadingStepProps {
   project: any;
@@ -46,31 +51,24 @@ interface DatabaseConnection {
   username: string;
 }
 
-const ModernDataLoadingStep: React.FC<DataLoadingStepProps> = ({
+const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
   project,
   onDataLoaded,
   updateProject,
 }) => {
   const [sourceType, setSourceType] = useState<'file' | 'db'>(project?.source_type || 'file');
-  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [dragActive, setDragActive] = useState(false);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
   
   // Database related states
   const [dbConnections, setDbConnections] = useState<DatabaseConnection[]>([]);
-  const [selectedConnection, setSelectedConnection] = useState<number | ''>('');
+  const [selectedConnection, setSelectedConnection] = useState<number | undefined>(undefined);
   const [tables, setTables] = useState<string[]>([]);
-  const [selectedTable, setSelectedTable] = useState('');
-  const [newConnectionDialog, setNewConnectionDialog] = useState(false);
-  const [newConnection, setNewConnection] = useState({
-    name: '',
-    host: '',
-    port: 5432,
-    database: '',
-    username: '',
-    password: '',
-  });
+  const [selectedTable, setSelectedTable] = useState<string>('');
+  const [connectionModalVisible, setConnectionModalVisible] = useState(false);
+  const [previewData, setPreviewData] = useState<any>(null);
+  
+  const [form] = Form.useForm();
 
   useEffect(() => {
     if (sourceType === 'db') {
@@ -89,44 +87,26 @@ const ModernDataLoadingStep: React.FC<DataLoadingStepProps> = ({
       const response = await axios.get('/api/data-source/db-connections');
       setDbConnections(response.data);
     } catch (error) {
+      message.error('Failed to fetch database connections');
       console.error('Error fetching DB connections:', error);
     }
   };
 
   const fetchTables = async () => {
+    if (!selectedConnection) return;
+    
     try {
       const response = await axios.get(`/api/data-source/db-connections/${selectedConnection}/tables`);
       setTables(response.data.tables);
     } catch (error) {
+      message.error('Failed to fetch tables');
       console.error('Error fetching tables:', error);
     }
   };
 
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleFileUpload = async () => {
-    if (!file) return;
-
+  const handleFileUpload: UploadProps['customRequest'] = async (options) => {
+    const { file, onSuccess, onError } = options;
     setLoading(true);
-    setError('');
 
     const formData = new FormData();
     formData.append('file', file);
@@ -143,9 +123,12 @@ const ModernDataLoadingStep: React.FC<DataLoadingStepProps> = ({
         file_path: response.data.file_path,
       });
 
+      onSuccess?.(response.data);
       onDataLoaded(response.data.source_info);
+      message.success('File uploaded successfully!');
     } catch (error: any) {
-      setError(error.response?.data?.detail || 'File upload failed');
+      onError?.(error);
+      message.error(error.response?.data?.detail || 'File upload failed');
     } finally {
       setLoading(false);
     }
@@ -155,8 +138,6 @@ const ModernDataLoadingStep: React.FC<DataLoadingStepProps> = ({
     if (!selectedConnection || !selectedTable) return;
 
     setLoading(true);
-    setError('');
-
     try {
       const response = await axios.get(
         `/api/data-source/db-connections/${selectedConnection}/tables/${selectedTable}/preview`
@@ -168,603 +149,410 @@ const ModernDataLoadingStep: React.FC<DataLoadingStepProps> = ({
         table_name: selectedTable,
       });
 
+      setPreviewData(response.data.source_info);
       onDataLoaded(response.data.source_info);
+      message.success('Data loaded successfully!');
     } catch (error: any) {
-      setError(error.response?.data?.detail || 'Database preview failed');
+      message.error(error.response?.data?.detail || 'Database preview failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleTestConnection = async () => {
+  const handleTestConnection = async (values: any) => {
     try {
-      await axios.post('/api/data-source/test-db-connection', {
-        host: newConnection.host,
-        port: newConnection.port,
-        database: newConnection.database,
-        username: newConnection.username,
-        password: newConnection.password,
-      });
-      
-      alert('Connection successful!');
+      await axios.post('/api/data-source/test-db-connection', values);
+      message.success('Connection successful!');
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Connection failed');
+      message.error(error.response?.data?.detail || 'Connection failed');
     }
   };
 
-  const handleSaveConnection = async () => {
+  const handleSaveConnection = async (values: any) => {
     try {
-      await axios.post('/api/data-source/db-connections', newConnection);
-      setNewConnectionDialog(false);
-      setNewConnection({
-        name: '',
-        host: '',
-        port: 5432,
-        database: '',
-        username: '',
-        password: '',
-      });
+      await axios.post('/api/data-source/db-connections', values);
+      message.success('Connection saved successfully!');
+      setConnectionModalVisible(false);
+      form.resetFields();
       fetchDbConnections();
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Failed to save connection');
+      message.error(error.response?.data?.detail || 'Failed to save connection');
     }
   };
 
-  const getFileIcon = (filename: string) => {
-    if (filename.endsWith('.csv')) return TableChart;
-    if (filename.endsWith('.json')) return DataObject;
-    if (filename.endsWith('.xlsx') || filename.endsWith('.xls')) return Description;
-    return Description;
+  const getFileIcon = (fileName: string) => {
+    if (fileName.endsWith('.csv')) return <TableOutlined style={{ color: '#10b981' }} />;
+    if (fileName.endsWith('.json')) return <ApiOutlined style={{ color: '#f59e0b' }} />;
+    if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) return <FileExcelOutlined style={{ color: '#06b6d4' }} />;
+    return <FileTextOutlined style={{ color: '#8b5cf6' }} />;
   };
 
-  const getFileTypeColor = (filename: string) => {
-    if (filename.endsWith('.csv')) return '#10b981';
-    if (filename.endsWith('.json')) return '#f59e0b';
-    if (filename.endsWith('.xlsx') || filename.endsWith('.xls')) return '#06b6d4';
-    return '#8b5cf6';
+  const uploadProps: UploadProps = {
+    name: 'file',
+    multiple: false,
+    accept: '.csv,.json,.xlsx,.xls',
+    fileList,
+    customRequest: handleFileUpload,
+    onChange: (info) => {
+      setFileList(info.fileList);
+    },
+    onDrop: (e) => {
+      console.log('Dropped files', e.dataTransfer.files);
+    },
   };
+
+  const previewColumns = previewData?.columns?.map((col: string) => ({
+    title: col,
+    dataIndex: col,
+    key: col,
+    ellipsis: true,
+  }));
 
   return (
-    <Box>
-      <Typography
-        variant="h5"
-        sx={{
-          color: 'rgba(255, 255, 255, 0.9)',
-          fontWeight: 600,
-          mb: 1,
-        }}
-      >
-        Data Source
-      </Typography>
-      <Typography
-        variant="body2"
-        sx={{
-          color: 'rgba(255, 255, 255, 0.6)',
-          mb: 4,
-        }}
-      >
-        Choose your data source to begin the machine learning pipeline
-      </Typography>
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      {/* Header */}
+      <div>
+        <Title level={3} style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: 8 }}>
+          Data Source
+        </Title>
+        <Paragraph style={{ color: 'rgba(255, 255, 255, 0.6)', marginBottom: 0 }}>
+          Choose your data source to begin the machine learning pipeline
+        </Paragraph>
+      </div>
 
       {/* Source Type Toggle */}
-      <Box sx={{ mb: 4 }}>
-        <ToggleButtonGroup
-          value={sourceType}
-          exclusive
-          onChange={(_, newSourceType) => newSourceType && setSourceType(newSourceType)}
-          sx={{
-            '& .MuiToggleButton-root': {
-              color: 'rgba(255, 255, 255, 0.6)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: '12px',
-              px: 3,
-              py: 1.5,
-              mx: 0.5,
-              background: 'rgba(30, 41, 59, 0.3)',
-              '&.Mui-selected': {
-                background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
-                color: 'white',
-                border: '1px solid #8b5cf6',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #7c3aed, #9333ea)',
-                },
-              },
-              '&:hover': {
-                background: 'rgba(30, 41, 59, 0.5)',
-              },
-            },
-          }}
-        >
-          <ToggleButton value="file">
-            <CloudUpload sx={{ mr: 1 }} />
-            File Upload
-          </ToggleButton>
-          <ToggleButton value="db">
-            <Storage sx={{ mr: 1 }} />
-            Database
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
-
-      {error && (
-        <Alert 
-          severity="error" 
-          sx={{ 
-            mb: 3,
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            color: '#fca5a5',
-            borderRadius: '12px',
-          }}
-        >
-          {error}
-        </Alert>
-      )}
-
-      {sourceType === 'file' && (
-        <Card
-          sx={{
-            background: 'rgba(30, 41, 59, 0.3)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '16px',
-            p: 3,
-          }}
-        >
-          <Typography
-            variant="h6"
-            sx={{
-              color: 'rgba(255, 255, 255, 0.9)',
-              fontWeight: 600,
-              mb: 2,
-            }}
-          >
-            Upload File
-          </Typography>
-          
-          {/* Drag & Drop Area */}
-          <Box
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-            sx={{
-              border: `2px dashed ${dragActive ? '#8b5cf6' : 'rgba(255, 255, 255, 0.2)'}`,
-              borderRadius: '12px',
-              p: 4,
-              textAlign: 'center',
-              background: dragActive 
-                ? 'rgba(139, 92, 246, 0.05)' 
-                : 'rgba(30, 41, 59, 0.2)',
-              transition: 'all 0.3s ease',
-              mb: 3,
-              cursor: 'pointer',
-            }}
-            onClick={() => document.getElementById('file-input')?.click()}
-          >
-            <input
-              id="file-input"
-              type="file"
-              accept=".csv,.json,.xlsx,.xls"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              style={{ display: 'none' }}
-            />
-            
-            <CloudUpload 
-              sx={{ 
-                fontSize: 48, 
-                color: dragActive ? '#8b5cf6' : 'rgba(255, 255, 255, 0.4)',
-                mb: 2
-              }} 
-            />
-            
-            <Typography
-              variant="h6"
-              sx={{
-                color: 'rgba(255, 255, 255, 0.8)',
-                mb: 1,
-              }}
-            >
-              {dragActive ? 'Drop your file here' : 'Drag & drop your file here'}
-            </Typography>
-            
-            <Typography
-              variant="body2"
-              sx={{
-                color: 'rgba(255, 255, 255, 0.6)',
-                mb: 2,
-              }}
-            >
-              or click to browse files
-            </Typography>
-
-            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
-              {['CSV', 'JSON', 'Excel'].map((type) => (
-                <Chip
-                  key={type}
-                  label={type}
-                  size="small"
-                  sx={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                  }}
-                />
-              ))}
-            </Box>
-          </Box>
-
-          {/* Selected File Display */}
-          {file && (
-            <Card
-              sx={{
-                background: 'rgba(139, 92, 246, 0.1)',
-                border: '1px solid rgba(139, 92, 246, 0.3)',
-                borderRadius: '12px',
-                p: 2,
-                mb: 3,
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                {React.createElement(getFileIcon(file.name), {
-                  sx: { 
-                    color: getFileTypeColor(file.name), 
-                    mr: 2, 
-                    fontSize: 32 
-                  }
-                })}
-                
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography
-                    variant="body1"
-                    sx={{
-                      color: 'rgba(255, 255, 255, 0.9)',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {file.name}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: 'rgba(255, 255, 255, 0.6)',
-                    }}
-                  >
-                    {(file.size / (1024 * 1024)).toFixed(2)} MB
-                  </Typography>
-                </Box>
-
-                <CheckCircle sx={{ color: '#10b981' }} />
-              </Box>
-            </Card>
-          )}
-
-          <Button
-            onClick={handleFileUpload}
-            disabled={!file || loading}
-            sx={{
-              background: !file || loading 
-                ? 'rgba(139, 92, 246, 0.3)' 
-                : 'linear-gradient(135deg, #8b5cf6, #a855f7)',
-              color: 'white',
-              px: 4,
-              py: 1.5,
-              borderRadius: '12px',
-              textTransform: 'none',
-              fontWeight: 600,
-              '&:hover': {
-                background: !file || loading 
-                  ? 'rgba(139, 92, 246, 0.3)' 
-                  : 'linear-gradient(135deg, #7c3aed, #9333ea)',
-              },
-              '&:disabled': {
-                color: 'rgba(255, 255, 255, 0.5)',
-              },
-            }}
-            startIcon={loading ? <CircularProgress size={20} /> : <CloudUpload />}
-          >
-            {loading ? 'Uploading...' : 'Upload & Analyze'}
-          </Button>
-        </Card>
-      )}
-
-      {sourceType === 'db' && (
-        <Card
-          sx={{
-            background: 'rgba(30, 41, 59, 0.3)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '16px',
-            p: 3,
-          }}
-        >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography
-              variant="h6"
-              sx={{
-                color: 'rgba(255, 255, 255, 0.9)',
-                fontWeight: 600,
-              }}
-            >
-              Database Connection
-            </Typography>
-            <Button
-              onClick={() => setNewConnectionDialog(true)}
-              sx={{
-                background: 'linear-gradient(135deg, #06b6d4, #0891b2)',
-                color: 'white',
-                px: 3,
-                py: 1,
-                borderRadius: '8px',
-                textTransform: 'none',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #0891b2, #0e7490)',
-                },
-              }}
-              startIcon={<Add />}
-            >
-              Add Connection
-            </Button>
-          </Box>
-
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                  Database Connection
-                </InputLabel>
-                <Select
-                  value={selectedConnection}
-                  onChange={(e) => setSelectedConnection(e.target.value as number)}
-                  sx={{
-                    color: 'white',
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: 'rgba(255, 255, 255, 0.2)',
-                    },
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: 'rgba(255, 255, 255, 0.4)',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#8b5cf6',
-                    },
-                  }}
-                >
-                  {dbConnections.map((conn) => (
-                    <MenuItem key={conn.id} value={conn.id}>
-                      {conn.name} ({conn.host}:{conn.port}/{conn.database})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                  Table
-                </InputLabel>
-                <Select
-                  value={selectedTable}
-                  onChange={(e) => setSelectedTable(e.target.value)}
-                  disabled={!selectedConnection}
-                  sx={{
-                    color: 'white',
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: 'rgba(255, 255, 255, 0.2)',
-                    },
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: 'rgba(255, 255, 255, 0.4)',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#8b5cf6',
-                    },
-                  }}
-                >
-                  {tables.map((table) => (
-                    <MenuItem key={table} value={table}>
-                      {table}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-
-          <Button
-            onClick={handleDbPreview}
-            disabled={!selectedConnection || !selectedTable || loading}
-            sx={{
-              background: !selectedConnection || !selectedTable || loading
-                ? 'rgba(139, 92, 246, 0.3)'
-                : 'linear-gradient(135deg, #8b5cf6, #a855f7)',
-              color: 'white',
-              px: 4,
-              py: 1.5,
-              borderRadius: '12px',
-              textTransform: 'none',
-              fontWeight: 600,
-              mt: 3,
-              '&:hover': {
-                background: !selectedConnection || !selectedTable || loading
-                  ? 'rgba(139, 92, 246, 0.3)'
-                  : 'linear-gradient(135deg, #7c3aed, #9333ea)',
-              },
-              '&:disabled': {
-                color: 'rgba(255, 255, 255, 0.5)',
-              },
-            }}
-            startIcon={loading ? <CircularProgress size={20} /> : <Storage />}
-          >
-            {loading ? 'Loading...' : 'Load Data'}
-          </Button>
-        </Card>
-      )}
-
-      {/* New Connection Dialog */}
-      <Dialog
-        open={newConnectionDialog}
-        onClose={() => setNewConnectionDialog(false)}
-        maxWidth="sm"
-        fullWidth
-        sx={{
-          '& .MuiDialog-paper': {
-            background: 'rgba(30, 41, 59, 0.9)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '20px',
-          },
+      <Card
+        title="Select Data Source Type"
+        style={{
+          background: 'rgba(30, 41, 59, 0.3)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
         }}
       >
-        <DialogTitle sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-          Add Database Connection
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Connection Name"
-                value={newConnection.name}
-                onChange={(e) => setNewConnection({ ...newConnection, name: e.target.value })}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                    '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
-                    '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.4)' },
-                    '&.Mui-focused fieldset': { borderColor: '#8b5cf6' },
-                  },
-                  '& .MuiInputBase-input': { color: 'white' },
-                  '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.6)' },
-                }}
+        <Row gutter={16}>
+          <Col span={12}>
+            <Card
+              hoverable
+              style={{
+                background: sourceType === 'file' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(30, 41, 59, 0.2)',
+                border: sourceType === 'file' ? '2px solid #8b5cf6' : '1px solid rgba(255, 255, 255, 0.1)',
+                cursor: 'pointer',
+              }}
+              onClick={() => setSourceType('file')}
+            >
+              <Space direction="vertical" align="center" style={{ width: '100%' }}>
+                <CloudUploadOutlined style={{ fontSize: 48, color: '#8b5cf6' }} />
+                <Title level={5} style={{ color: 'rgba(255, 255, 255, 0.9)', margin: 0 }}>
+                  File Upload
+                </Title>
+                <Text style={{ color: 'rgba(255, 255, 255, 0.6)', textAlign: 'center' }}>
+                  Upload CSV, JSON, or Excel files
+                </Text>
+              </Space>
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card
+              hoverable
+              style={{
+                background: sourceType === 'db' ? 'rgba(6, 182, 212, 0.1)' : 'rgba(30, 41, 59, 0.2)',
+                border: sourceType === 'db' ? '2px solid #06b6d4' : '1px solid rgba(255, 255, 255, 0.1)',
+                cursor: 'pointer',
+              }}
+              onClick={() => setSourceType('db')}
+            >
+              <Space direction="vertical" align="center" style={{ width: '100%' }}>
+                <DatabaseOutlined style={{ fontSize: 48, color: '#06b6d4' }} />
+                <Title level={5} style={{ color: 'rgba(255, 255, 255, 0.9)', margin: 0 }}>
+                  Database
+                </Title>
+                <Text style={{ color: 'rgba(255, 255, 255, 0.6)', textAlign: 'center' }}>
+                  Connect to PostgreSQL database
+                </Text>
+              </Space>
+            </Card>
+          </Col>
+        </Row>
+      </Card>
+
+      {/* File Upload Section */}
+      {sourceType === 'file' && (
+        <Card
+          title="Upload File"
+          style={{
+            background: 'rgba(30, 41, 59, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+          }}
+        >
+          <Dragger {...uploadProps} style={{ background: 'rgba(30, 41, 59, 0.2)' }}>
+            <p className="ant-upload-drag-icon">
+              <CloudUploadOutlined style={{ color: '#8b5cf6' }} />
+            </p>
+            <p className="ant-upload-text" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+              Click or drag file to this area to upload
+            </p>
+            <p className="ant-upload-hint" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+              Support for CSV, JSON, Excel files. Single file upload only.
+            </p>
+          </Dragger>
+
+          {fileList.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <Alert
+                message="File Ready"
+                description={
+                  <Space>
+                    {getFileIcon(fileList[0].name)}
+                    <Text style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                      {fileList[0].name}
+                    </Text>
+                    <Tag color="success">
+                      {((fileList[0].size || 0) / (1024 * 1024)).toFixed(2)} MB
+                    </Tag>
+                  </Space>
+                }
+                type="success"
+                showIcon
+                icon={<CheckCircleOutlined />}
               />
-            </Grid>
-            <Grid item xs={8}>
-              <TextField
-                fullWidth
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Database Connection Section */}
+      {sourceType === 'db' && (
+        <Card
+          title={
+            <Space>
+              <span>Database Connection</span>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                size="small"
+                onClick={() => setConnectionModalVisible(true)}
+              >
+                Add Connection
+              </Button>
+            </Space>
+          }
+          style={{
+            background: 'rgba(30, 41, 59, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+          }}
+        >
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label={<Text style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Database Connection</Text>}>
+                <Select
+                  placeholder="Select database connection"
+                  value={selectedConnection}
+                  onChange={setSelectedConnection}
+                  style={{ width: '100%' }}
+                >
+                  {dbConnections.map((conn) => (
+                    <Option key={conn.id} value={conn.id}>
+                      {conn.name} ({conn.host}:{conn.port}/{conn.database})
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label={<Text style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Table</Text>}>
+                <Select
+                  placeholder="Select table"
+                  value={selectedTable}
+                  onChange={setSelectedTable}
+                  disabled={!selectedConnection}
+                  style={{ width: '100%' }}
+                >
+                  {tables.map((table) => (
+                    <Option key={table} value={table}>
+                      {table}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Button
+            type="primary"
+            icon={<DatabaseOutlined />}
+            onClick={handleDbPreview}
+            disabled={!selectedConnection || !selectedTable || loading}
+            loading={loading}
+            size="large"
+          >
+            {loading ? 'Loading Data...' : 'Load Data'}
+          </Button>
+        </Card>
+      )}
+
+      {/* Data Preview */}
+      {previewData && (
+        <Card
+          title="Data Preview"
+          style={{
+            background: 'rgba(30, 41, 59, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+          }}
+        >
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Card size="small" style={{ background: 'rgba(139, 92, 246, 0.1)' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Text style={{ color: '#8b5cf6', fontSize: '24px', fontWeight: 'bold' }}>
+                      {previewData.row_count}
+                    </Text>
+                    <br />
+                    <Text style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Total Rows</Text>
+                  </div>
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small" style={{ background: 'rgba(6, 182, 212, 0.1)' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Text style={{ color: '#06b6d4', fontSize: '24px', fontWeight: 'bold' }}>
+                      {previewData.columns?.length || 0}
+                    </Text>
+                    <br />
+                    <Text style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Columns</Text>
+                  </div>
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small" style={{ background: 'rgba(16, 185, 129, 0.1)' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Text style={{ color: '#10b981', fontSize: '24px', fontWeight: 'bold' }}>
+                      {previewData.source_type === 'file' ? 'FILE' : 'DB'}
+                    </Text>
+                    <br />
+                    <Text style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Source Type</Text>
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+
+            <Table
+              columns={previewColumns}
+              dataSource={previewData.sample_data?.map((row: any, index: number) => ({ ...row, key: index }))}
+              pagination={false}
+              scroll={{ x: true }}
+              size="small"
+              style={{ background: 'rgba(30, 41, 59, 0.2)' }}
+            />
+          </Space>
+        </Card>
+      )}
+
+      {/* New Connection Modal */}
+      <Modal
+        title="Add Database Connection"
+        open={connectionModalVisible}
+        onCancel={() => {
+          setConnectionModalVisible(false);
+          form.resetFields();
+        }}
+        footer={null}
+        width={600}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSaveConnection}
+        >
+          <Form.Item
+            name="name"
+            label="Connection Name"
+            rules={[{ required: true, message: 'Please enter connection name!' }]}
+          >
+            <Input placeholder="Enter connection name" />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={16}>
+              <Form.Item
+                name="host"
                 label="Host"
-                value={newConnection.host}
-                onChange={(e) => setNewConnection({ ...newConnection, host: e.target.value })}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                    '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
-                    '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.4)' },
-                    '&.Mui-focused fieldset': { borderColor: '#8b5cf6' },
-                  },
-                  '& .MuiInputBase-input': { color: 'white' },
-                  '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.6)' },
-                }}
-              />
-            </Grid>
-            <Grid item xs={4}>
-              <TextField
-                fullWidth
+                rules={[{ required: true, message: 'Please enter host!' }]}
+              >
+                <Input placeholder="localhost" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="port"
                 label="Port"
-                type="number"
-                value={newConnection.port}
-                onChange={(e) => setNewConnection({ ...newConnection, port: parseInt(e.target.value) })}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                    '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
-                    '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.4)' },
-                    '&.Mui-focused fieldset': { borderColor: '#8b5cf6' },
-                  },
-                  '& .MuiInputBase-input': { color: 'white' },
-                  '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.6)' },
-                }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Database"
-                value={newConnection.database}
-                onChange={(e) => setNewConnection({ ...newConnection, database: e.target.value })}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                    '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
-                    '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.4)' },
-                    '&.Mui-focused fieldset': { borderColor: '#8b5cf6' },
-                  },
-                  '& .MuiInputBase-input': { color: 'white' },
-                  '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.6)' },
-                }}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
+                initialValue={5432}
+                rules={[{ required: true, message: 'Please enter port!' }]}
+              >
+                <Input type="number" placeholder="5432" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="database"
+            label="Database"
+            rules={[{ required: true, message: 'Please enter database name!' }]}
+          >
+            <Input placeholder="Enter database name" />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="username"
                 label="Username"
-                value={newConnection.username}
-                onChange={(e) => setNewConnection({ ...newConnection, username: e.target.value })}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                    '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
-                    '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.4)' },
-                    '&.Mui-focused fieldset': { borderColor: '#8b5cf6' },
-                  },
-                  '& .MuiInputBase-input': { color: 'white' },
-                  '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.6)' },
-                }}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
+                rules={[{ required: true, message: 'Please enter username!' }]}
+              >
+                <Input placeholder="Enter username" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="password"
                 label="Password"
-                type="password"
-                value={newConnection.password}
-                onChange={(e) => setNewConnection({ ...newConnection, password: e.target.value })}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                    '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
-                    '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.4)' },
-                    '&.Mui-focused fieldset': { borderColor: '#8b5cf6' },
-                  },
-                  '& .MuiInputBase-input': { color: 'white' },
-                  '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.6)' },
+                rules={[{ required: true, message: 'Please enter password!' }]}
+              >
+                <Input.Password placeholder="Enter password" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item>
+            <Space>
+              <Button onClick={() => form.validateFields().then(handleTestConnection)}>
+                Test Connection
+              </Button>
+              <Button type="primary" htmlType="submit">
+                Save Connection
+              </Button>
+              <Button
+                onClick={() => {
+                  setConnectionModalVisible(false);
+                  form.resetFields();
                 }}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button
-            onClick={() => setNewConnectionDialog(false)}
-            sx={{ color: 'rgba(255, 255, 255, 0.6)' }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleTestConnection}
-            sx={{
-              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-              color: 'white',
-              mx: 1,
-              '&:hover': {
-                background: 'linear-gradient(135deg, #d97706, #b45309)',
-              },
-            }}
-          >
-            Test Connection
-          </Button>
-          <Button
-            onClick={handleSaveConnection}
-            sx={{
-              background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
-              color: 'white',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #7c3aed, #9333ea)',
-              },
-            }}
-          >
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+              >
+                Cancel
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+          <Spin size="large" />
+          <div style={{ marginTop: 16 }}>
+            <Text style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Processing data...</Text>
+          </div>
+        </div>
+      )}
+    </Space>
   );
 };
 
-export default ModernDataLoadingStep;
+export default DataLoadingStep;

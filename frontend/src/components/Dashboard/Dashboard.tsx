@@ -1,34 +1,44 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Box,
+  Layout,
+  Card,
   Typography,
   Button,
-  Grid,
-  Card,
-  CardContent,
-  IconButton,
+  Row,
+  Col,
   Avatar,
-  Menu,
-  MenuItem,
-  Fab,
-  Dialog,
-  DialogContent,
-  DialogActions,
-  TextField,
-} from '@mui/material';
-import { 
-  Add, 
-  MoreVert, 
-  Timeline, 
-  Storage, 
-  AutoAwesome,
-  Person,
-  Logout,
-  Analytics
-} from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+  Dropdown,
+  Space,
+  Modal,
+  Form,
+  Input,
+  FloatButton,
+  Empty,
+  Tag,
+  message,
+  Spin,
+} from 'antd';
+import {
+  PlusOutlined,
+  MoreOutlined,
+  UserOutlined,
+  LogoutOutlined,
+  ExperimentOutlined,
+  DatabaseOutlined,
+  FunctionOutlined,
+  LineChartOutlined,
+  CalendarOutlined,
+  DeleteOutlined,
+  EditOutlined,
+} from '@ant-design/icons';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
+import dayjs from 'dayjs';
+
+const { Header, Content } = Layout;
+const { Title, Text, Paragraph } = Typography;
+const { Meta } = Card;
 
 interface Project {
   id: number;
@@ -36,15 +46,17 @@ interface Project {
   description: string;
   created_at: string;
   updated_at: string;
+  source_type?: string;
+  date_column?: string;
+  value_column?: string;
 }
 
-const ModernDashboard: React.FC = () => {
+const Dashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectDescription, setNewProjectDescription] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [form] = Form.useForm();
+  const [creating, setCreating] = useState(false);
   
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -58,48 +70,95 @@ const ModernDashboard: React.FC = () => {
       const response = await axios.get('/api/projects');
       setProjects(response.data);
     } catch (error) {
+      message.error('Failed to fetch projects');
       console.error('Error fetching projects:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateProject = async () => {
-    if (!newProjectName.trim()) return;
-
+  const handleCreateProject = async (values: { name: string; description?: string }) => {
+    setCreating(true);
     try {
-      const response = await axios.post('/api/projects', {
-        name: newProjectName,
-        description: newProjectDescription,
-      });
-      
-      setProjects([...projects, response.data]);
-      setCreateDialogOpen(false);
-      setNewProjectName('');
-      setNewProjectDescription('');
+      const response = await axios.post('/api/projects', values);
+      setProjects([response.data, ...projects]);
+      setModalVisible(false);
+      form.resetFields();
+      message.success('Project created successfully!');
     } catch (error) {
+      message.error('Failed to create project');
       console.error('Error creating project:', error);
+    } finally {
+      setCreating(false);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+  const handleDeleteProject = async (projectId: number) => {
+    try {
+      await axios.delete(`/api/projects/${projectId}`);
+      setProjects(projects.filter(p => p.id !== projectId));
+      message.success('Project deleted successfully!');
+    } catch (error) {
+      message.error('Failed to delete project');
+      console.error('Error deleting project:', error);
+    }
   };
 
-  const getProjectIcon = (index: number) => {
-    const icons = [Timeline, Storage, AutoAwesome, Analytics];
+  const getProjectIcon = (project: Project, index: number) => {
+    const icons = [ExperimentOutlined, DatabaseOutlined, FunctionOutlined, LineChartOutlined];
     const colors = ['#8b5cf6', '#06b6d4', '#f59e0b', '#10b981'];
     const IconComponent = icons[index % icons.length];
     return { IconComponent, color: colors[index % colors.length] };
   };
 
+  const getProjectStatus = (project: Project) => {
+    if (!project.source_type) return { status: 'Not Started', color: '#6b7280' };
+    if (!project.date_column || !project.value_column) return { status: 'Data Loading', color: '#f59e0b' };
+    return { status: 'In Progress', color: '#10b981' };
+  };
+
+  const userMenuItems = [
+    {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: 'Profile',
+      onClick: () => message.info('Profile feature coming soon'),
+    },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: 'Logout',
+      onClick: logout,
+    },
+  ];
+
+  const projectMenuItems = (project: Project) => [
+    {
+      key: 'edit',
+      icon: <EditOutlined />,
+      label: 'Edit',
+      onClick: () => message.info('Edit feature coming soon'),
+    },
+    {
+      key: 'delete',
+      icon: <DeleteOutlined />,
+      label: 'Delete',
+      onClick: () => {
+        Modal.confirm({
+          title: 'Delete Project',
+          content: 'Are you sure you want to delete this project? This action cannot be undone.',
+          okText: 'Delete',
+          okType: 'danger',
+          cancelText: 'Cancel',
+          onOk: () => handleDeleteProject(project.id),
+        });
+      },
+    },
+  ];
+
   return (
-    <Box
-      sx={{
+    <Layout
+      style={{
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f1419 100%)',
         position: 'relative',
@@ -107,8 +166,8 @@ const ModernDashboard: React.FC = () => {
       }}
     >
       {/* Background decorative elements */}
-      <Box
-        sx={{
+      <div
+        style={{
           position: 'absolute',
           top: '10%',
           right: '10%',
@@ -120,8 +179,8 @@ const ModernDashboard: React.FC = () => {
           filter: 'blur(60px)',
         }}
       />
-      <Box
-        sx={{
+      <div
+        style={{
           position: 'absolute',
           bottom: '20%',
           left: '5%',
@@ -135,445 +194,360 @@ const ModernDashboard: React.FC = () => {
       />
 
       {/* Header */}
-      <Box
-        sx={{
+      <Header
+        style={{
           background: 'rgba(30, 41, 59, 0.3)',
           backdropFilter: 'blur(20px)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          px: 4,
-          py: 2,
+          padding: '0 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
         }}
       >
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            maxWidth: 1200,
-            mx: 'auto',
+        <Title
+          level={3}
+          style={{
+            margin: 0,
+            background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            color: 'transparent',
+            fontWeight: 700,
           }}
         >
-          <Typography
-            variant="h5"
-            sx={{
-              fontWeight: 700,
-              background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              color: 'transparent',
-            }}
-          >
-            ML Constructor
-          </Typography>
+          ML Constructor
+        </Title>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ textAlign: 'right' }}>
-              <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                Welcome back,
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                {user?.email}
-              </Typography>
-          </Box>
+        <Space size="middle">
+          <div style={{ textAlign: 'right' }}>
+            <Text style={{ color: 'rgba(255, 255, 255, 0.9)', display: 'block' }}>
+              Welcome back,
+            </Text>
+            <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '12px' }}>
+              {user?.email}
+            </Text>
+          </div>
+          
+          <Dropdown
+            menu={{ items: userMenuItems }}
+            placement="bottomRight"
+            trigger={['click']}
+          >
+            <Avatar
+              style={{
+                background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
+                cursor: 'pointer',
+              }}
+              size="large"
+              icon={<UserOutlined />}
+            />
+          </Dropdown>
+        </Space>
+      </Header>
 
       {/* Main Content */}
-      <Box sx={{ maxWidth: 1200, mx: 'auto', p: 4 }}>
+      <Content style={{ padding: '24px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
         {/* Welcome Section */}
-        <Box sx={{ mb: 6 }}>
-          <Typography
-            variant="h3"
-            sx={{
+        <div style={{ marginBottom: '32px' }}>
+          <Title
+            level={1}
+            style={{
               color: 'rgba(255, 255, 255, 0.9)',
               fontWeight: 700,
-              mb: 2,
+              marginBottom: '8px',
             }}
           >
             Your ML Projects
-          </Typography>
-          <Typography
-            variant="h6"
-            sx={{
+          </Title>
+          <Paragraph
+            style={{
               color: 'rgba(255, 255, 255, 0.6)',
-              fontWeight: 400,
+              fontSize: '16px',
+              marginBottom: 0,
             }}
           >
             Build, train, and deploy machine learning models with ease
-          </Typography>
-        </Box>
+          </Paragraph>
+        </div>
 
         {/* Projects Grid */}
         {loading ? (
-          <Typography sx={{ color: 'rgba(255, 255, 255, 0.6)', textAlign: 'center', py: 8 }}>
-            Loading projects...
-          </Typography>
+          <div style={{ textAlign: 'center', padding: '64px 0' }}>
+            <Spin size="large" />
+            <Text style={{ color: 'rgba(255, 255, 255, 0.6)', display: 'block', marginTop: 16 }}>
+              Loading projects...
+            </Text>
+          </div>
+        ) : projects.length === 0 ? (
+          <Card
+            style={{
+              background: 'rgba(30, 41, 59, 0.3)',
+              borderRadius: '20px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              textAlign: 'center',
+              padding: '48px 24px',
+            }}
+          >
+            <Empty
+              image={
+                <ExperimentOutlined
+                  style={{
+                    fontSize: 64,
+                    color: '#8b5cf6',
+                    marginBottom: 16,
+                  }}
+                />
+              }
+              description={
+                <div>
+                  <Title level={4} style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: 8 }}>
+                    No projects yet
+                  </Title>
+                  <Paragraph style={{ color: 'rgba(255, 255, 255, 0.6)', marginBottom: 24 }}>
+                    Create your first machine learning project to get started with time series analysis and feature engineering
+                  </Paragraph>
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<PlusOutlined />}
+                    onClick={() => setModalVisible(true)}
+                    style={{
+                      background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
+                      border: 'none',
+                      borderRadius: '12px',
+                      height: '48px',
+                      paddingLeft: '24px',
+                      paddingRight: '24px',
+                      fontSize: '16px',
+                    }}
+                  >
+                    Create Your First Project
+                  </Button>
+                </div>
+              }
+            />
+          </Card>
         ) : (
-          <Grid container spacing={3}>
+          <Row gutter={[24, 24]}>
             {projects.map((project, index) => {
-              const { IconComponent, color } = getProjectIcon(index);
+              const { IconComponent, color } = getProjectIcon(project, index);
+              const { status, color: statusColor } = getProjectStatus(project);
+
               return (
-                <Grid item xs={12} sm={6} lg={4} key={project.id}>
+                <Col xs={24} sm={12} lg={8} key={project.id}>
                   <Card
+                    hoverable
                     onClick={() => navigate(`/projects/${project.id}`)}
-                    sx={{
+                    style={{
                       background: 'rgba(30, 41, 59, 0.3)',
                       backdropFilter: 'blur(20px)',
                       border: '1px solid rgba(255, 255, 255, 0.1)',
                       borderRadius: '20px',
                       cursor: 'pointer',
                       transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'translateY(-8px)',
-                        boxShadow: `0 20px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px ${color}33`,
-                        background: 'rgba(30, 41, 59, 0.5)',
-                      },
                     }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-8px)';
+                      e.currentTarget.style.boxShadow = `0 20px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px ${color}33`;
+                      e.currentTarget.style.background = 'rgba(30, 41, 59, 0.5)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.background = 'rgba(30, 41, 59, 0.3)';
+                    }}
+                    actions={[
+                      <Dropdown
+                        key="more"
+                        menu={{ items: projectMenuItems(project) }}
+                        placement="bottomRight"
+                        trigger={['click']}
+                      >
+                        <Button
+                          type="text"
+                          icon={<MoreOutlined />}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ color: 'rgba(255, 255, 255, 0.6)' }}
+                        />
+                      </Dropdown>,
+                    ]}
                   >
-                    <CardContent sx={{ p: 3 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
-                        <Box
-                          sx={{
+                    <Meta
+                      avatar={
+                        <Avatar
+                          style={{
+                            background: `linear-gradient(135deg, ${color}, ${color}CC)`,
                             width: 48,
                             height: 48,
-                            borderRadius: '12px',
-                            background: `linear-gradient(135deg, ${color}, ${color}CC)`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            mr: 2,
                           }}
-                        >
-                          <IconComponent sx={{ color: 'white', fontSize: 24 }} />
-                        </Box>
-                        <IconButton
-                          size="small"
-                          sx={{ 
-                            color: 'rgba(255, 255, 255, 0.5)',
-                            ml: 'auto',
-                          }}
-                        >
-                          <MoreVert />
-                        </IconButton>
-                      </Box>
-
-                      <Typography
-                        variant="h6"
-                        sx={{
-                          color: 'rgba(255, 255, 255, 0.9)',
-                          fontWeight: 600,
-                          mb: 1,
-                        }}
-                      >
-                        {project.name}
-                      </Typography>
-
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color: 'rgba(255, 255, 255, 0.6)',
-                          mb: 3,
-                          minHeight: '40px',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {project.description || 'No description provided'}
-                      </Typography>
-
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: 'rgba(255, 255, 255, 0.5)',
-                          }}
-                        >
-                          Updated {formatDate(project.updated_at)}
-                        </Typography>
-                        <Box
-                          sx={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            backgroundColor: color,
-                            boxShadow: `0 0 10px ${color}66`,
-                          }}
+                          icon={<IconComponent style={{ fontSize: 24 }} />}
                         />
-                      </Box>
-                    </CardContent>
+                      }
+                      title={
+                        <div>
+                          <Title
+                            level={5}
+                            style={{
+                              color: 'rgba(255, 255, 255, 0.9)',
+                              margin: '0 0 4px 0',
+                            }}
+                          >
+                            {project.name}
+                          </Title>
+                          <Tag color={statusColor} style={{ fontSize: '10px' }}>
+                            {status}
+                          </Tag>
+                        </div>
+                      }
+                      description={
+                        <div>
+                          <Paragraph
+                            style={{
+                              color: 'rgba(255, 255, 255, 0.6)',
+                              margin: '8px 0 16px 0',
+                              minHeight: '40px',
+                            }}
+                            ellipsis={{ rows: 2 }}
+                          >
+                            {project.description || 'No description provided'}
+                          </Paragraph>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px' }}>
+                              <CalendarOutlined style={{ marginRight: 4 }} />
+                              Updated {dayjs(project.updated_at).format('MMM D, YYYY')}
+                            </Text>
+                            <div
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                backgroundColor: color,
+                                boxShadow: `0 0 10px ${color}66`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      }
+                    />
                   </Card>
-                </Grid>
+                </Col>
               );
             })}
-
-            {/* Empty State */}
-            {projects.length === 0 && (
-              <Grid item xs={12}>
-                <Box
-                  sx={{
-                    textAlign: 'center',
-                    py: 8,
-                    px: 4,
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: 120,
-                      height: 120,
-                      borderRadius: '50%',
-                      background: 'rgba(139, 92, 246, 0.1)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      mx: 'auto',
-                      mb: 3,
-                    }}
-                  >
-                    <Timeline sx={{ fontSize: 48, color: '#8b5cf6' }} />
-                  </Box>
-                  <Typography
-                    variant="h5"
-                    sx={{
-                      color: 'rgba(255, 255, 255, 0.9)',
-                      fontWeight: 600,
-                      mb: 2,
-                    }}
-                  >
-                    No projects yet
-                  </Typography>
-                  <Typography
-                    variant="body1"
-                    sx={{
-                      color: 'rgba(255, 255, 255, 0.6)',
-                      mb: 4,
-                      maxWidth: 400,
-                      mx: 'auto',
-                    }}
-                  >
-                    Create your first machine learning project to get started with time series analysis and feature engineering
-                  </Typography>
-                  <Button
-                    onClick={() => setCreateDialogOpen(true)}
-                    sx={{
-                      background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
-                      color: 'white',
-                      px: 4,
-                      py: 1.5,
-                      borderRadius: '12px',
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      '&:hover': {
-                        background: 'linear-gradient(135deg, #7c3aed, #9333ea)',
-                        boxShadow: '0 10px 25px rgba(139, 92, 246, 0.3)',
-                      },
-                    }}
-                  >
-                    Create Your First Project
-                  </Button>
-                </Box>
-              </Grid>
-            )}
-          </Grid>
+          </Row>
         )}
-      </Box>
+      </Content>
 
       {/* Floating Action Button */}
       {projects.length > 0 && (
-        <Fab
-          onClick={() => setCreateDialogOpen(true)}
-          sx={{
-            position: 'fixed',
-            bottom: 32,
-            right: 32,
-            background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #7c3aed, #9333ea)',
-              boxShadow: '0 10px 25px rgba(139, 92, 246, 0.4)',
-            },
+        <FloatButton
+          icon={<PlusOutlined />}
+          type="primary"
+          style={{
+            backgroundColor: '#8b5cf6',
+            boxShadow: '0 10px 25px rgba(139, 92, 246, 0.4)',
           }}
-        >
-          <Add sx={{ color: 'white' }} />
-        </Fab>
+          onClick={() => setModalVisible(true)}
+        />
       )}
 
-      {/* Create Project Dialog */}
-      <Dialog
-        open={createDialogOpen}
-        onClose={() => setCreateDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        sx={{
-          '& .MuiDialog-paper': {
-            background: 'rgba(30, 41, 59, 0.9)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '20px',
-          },
+      {/* Create Project Modal */}
+      <Modal
+        title={
+          <Title level={4} style={{ color: 'rgba(255, 255, 255, 0.9)', margin: 0 }}>
+            Create New Project
+          </Title>
+        }
+        open={modalVisible}
+        onCancel={() => {
+          setModalVisible(false);
+          form.resetFields();
+        }}
+        footer={null}
+        styles={{
+          body: { backgroundColor: 'rgba(30, 41, 59, 0.9)' },
+          header: { backgroundColor: 'rgba(30, 41, 59, 0.9)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' },
+        }}
+        style={{
+          top: '20vh',
         }}
       >
-        <DialogContent sx={{ p: 4 }}>
-          <Typography
-            variant="h5"
-            sx={{
-              color: 'rgba(255, 255, 255, 0.9)',
-              fontWeight: 600,
-              mb: 1,
-            }}
-          >
-            Create New Project
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              color: 'rgba(255, 255, 255, 0.6)',
-              mb: 4,
-            }}
-          >
-            Start building your next machine learning model
-          </Typography>
+        <Paragraph style={{ color: 'rgba(255, 255, 255, 0.6)', marginBottom: 24 }}>
+          Start building your next machine learning model
+        </Paragraph>
 
-          <TextField
-            fullWidth
-            placeholder="Project name"
-            value={newProjectName}
-            onChange={(e) => setNewProjectName(e.target.value)}
-            sx={{
-              mb: 3,
-              '& .MuiOutlinedInput-root': {
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleCreateProject}
+        >
+          <Form.Item
+            name="name"
+            label={<Text style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Project Name</Text>}
+            rules={[
+              { required: true, message: 'Please enter project name!' },
+              { min: 2, message: 'Project name must be at least 2 characters!' },
+            ]}
+          >
+            <Input
+              placeholder="Enter project name"
+              style={{
                 backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                '& fieldset': { border: 'none' },
-                '&:hover': {
-                  backgroundColor: 'rgba(30, 41, 59, 0.7)',
-                  border: '1px solid rgba(139, 92, 246, 0.3)',
-                },
-                '&.Mui-focused': {
-                  backgroundColor: 'rgba(30, 41, 59, 0.8)',
-                  border: '1px solid #8b5cf6',
-                  boxShadow: '0 0 0 3px rgba(139, 92, 246, 0.1)',
-                },
-              },
-              '& .MuiInputBase-input': {
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: '8px',
                 color: 'white',
-                '&::placeholder': {
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  opacity: 1,
-                },
-              },
-            }}
-          />
+              }}
+            />
+          </Form.Item>
 
-          <TextField
-            fullWidth
-            multiline
-            rows={3}
-            placeholder="Description (optional)"
-            value={newProjectDescription}
-            onChange={(e) => setNewProjectDescription(e.target.value)}
-            sx={{
-              mb: 4,
-              '& .MuiOutlinedInput-root': {
+          <Form.Item
+            name="description"
+            label={<Text style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Description (Optional)</Text>}
+          >
+            <Input.TextArea
+              rows={3}
+              placeholder="Enter project description"
+              style={{
                 backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                borderRadius: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                '& fieldset': { border: 'none' },
-                '&:hover': {
-                  backgroundColor: 'rgba(30, 41, 59, 0.7)',
-                  border: '1px solid rgba(139, 92, 246, 0.3)',
-                },
-                '&.Mui-focused': {
-                  backgroundColor: 'rgba(30, 41, 59, 0.8)',
-                  border: '1px solid #8b5cf6',
-                  boxShadow: '0 0 0 3px rgba(139, 92, 246, 0.1)',
-                },
-              },
-              '& .MuiInputBase-input': {
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: '8px',
                 color: 'white',
-                '&::placeholder': {
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  opacity: 1,
-                },
-              },
-            }}
-          />
-        </DialogContent>
+              }}
+            />
+          </Form.Item>
 
-        <DialogActions sx={{ p: 4, pt: 0 }}>
-          <Button
-            onClick={() => setCreateDialogOpen(false)}
-            sx={{
-              color: 'rgba(255, 255, 255, 0.6)',
-              textTransform: 'none',
-              px: 3,
-              py: 1,
-              borderRadius: '8px',
-              '&:hover': {
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              },
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleCreateProject}
-            disabled={!newProjectName.trim()}
-            sx={{
-              background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
-              color: 'white',
-              textTransform: 'none',
-              px: 3,
-              py: 1,
-              borderRadius: '8px',
-              ml: 2,
-              '&:hover': {
-                background: 'linear-gradient(135deg, #7c3aed, #9333ea)',
-              },
-              '&:disabled': {
-                background: 'rgba(139, 92, 246, 0.3)',
-                color: 'rgba(255, 255, 255, 0.5)',
-              },
-            }}
-          >
-            Create Project
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+          <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
+            <Space>
+              <Button
+                onClick={() => {
+                  setModalVisible(false);
+                  form.resetFields();
+                }}
+                style={{
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={creating}
+                style={{
+                  background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
+                  border: 'none',
+                  borderRadius: '8px',
+                }}
+              >
+                {creating ? 'Creating...' : 'Create Project'}
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+    </Layout>
   );
 };
 
-export default ModernDashboard;
-            
-            <Avatar
-              onClick={(e) => setAnchorEl(e.currentTarget)}
-              sx={{
-                background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
-                cursor: 'pointer',
-                width: 48,
-                height: 48,
-              }}
-            >
-              <Person />
-            </Avatar>
-            
-            <Menu
-              anchorEl={anchorEl}
-              open={Boolean(anchorEl)}
-              onClose={() => setAnchorEl(null)}
-              sx={{
-                '& .MuiPaper-root': {
-                  backgroundColor: 'rgba(30, 41, 59, 0.9)',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '12px',
-                },
-              }}
-            >
-              <MenuItem onClick={logout} sx={{ color: 'white' }}>
-                <Logout sx={{ mr: 1, fontSize: 20 }} />
-                Logout
-              </MenuItem>
-            </Menu>
-          </Box>
-        </Box>
+export default Dashboard;

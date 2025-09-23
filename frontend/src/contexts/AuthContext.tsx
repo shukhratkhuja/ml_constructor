@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { message } from 'antd';
 import axios from 'axios';
 
 interface User {
@@ -44,6 +45,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } else {
       setLoading(false);
     }
+
+    // Add response interceptor for handling token expiration
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          logout();
+          message.error('Session expired. Please login again.');
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
   }, [token]);
 
   const fetchUser = async () => {
@@ -68,18 +85,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       
       await fetchUser();
+      message.success('Login successful!');
     } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Login failed');
+      const errorMessage = error.response?.data?.detail || 'Login failed';
+      message.error(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
   const register = async (email: string, password: string) => {
     try {
       await axios.post('/api/auth/register', { email, password });
+      message.success('Registration successful!');
       // After successful registration, automatically log in
       await login(email, password);
     } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Registration failed');
+      const errorMessage = error.response?.data?.detail || 'Registration failed';
+      message.error(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
@@ -88,6 +111,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setToken(null);
     setUser(null);
     delete axios.defaults.headers.common['Authorization'];
+    message.success('Logged out successfully');
   };
 
   const value = {

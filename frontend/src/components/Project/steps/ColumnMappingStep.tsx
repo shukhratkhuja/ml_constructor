@@ -1,25 +1,28 @@
 import React, { useState } from 'react';
 import {
-  Box,
-  Button,
-  Typography,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Grid,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Alert,
   Card,
-  Chip,
+  Typography,
+  Button,
+  Select,
+  Form,
+  Row,
+  Col,
+  Space,
+  Table,
+  Tag,
+  Alert,
   Avatar,
-} from '@mui/material';
-import { CalendarMonth, TrendingUp, Category, CheckCircle } from '@mui/icons-material';
+  message,
+} from 'antd';
+import {
+  CalendarOutlined,
+  LineChartOutlined,
+  AppstoreOutlined,
+  CheckCircleOutlined,
+} from '@ant-design/icons';
+
+const { Title, Text, Paragraph } = Typography;
+const { Option } = Select;
 
 interface ColumnMappingStepProps {
   project: any;
@@ -28,40 +31,31 @@ interface ColumnMappingStepProps {
   updateProject: (updates: any) => Promise<any>;
 }
 
-const ModernColumnMappingStep: React.FC<ColumnMappingStepProps> = ({
+const ColumnMappingStep: React.FC<ColumnMappingStepProps> = ({
   project,
   dataInfo,
   onMappingComplete,
   updateProject,
 }) => {
-  const [dateColumn, setDateColumn] = useState(project?.date_column || '');
-  const [valueColumn, setValueColumn] = useState(project?.value_column || '');
-  const [productColumn, setProductColumn] = useState(project?.product_column || '');
+  const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const columns = dataInfo?.columns || [];
   const sampleData = dataInfo?.sample_data || [];
 
-  const handleSaveMapping = async () => {
-    if (!dateColumn || !valueColumn) {
-      setError('Date and Value columns are required');
-      return;
-    }
-
+  const handleSaveMapping = async (values: any) => {
     setLoading(true);
-    setError('');
-
     try {
       await updateProject({
-        date_column: dateColumn,
-        value_column: valueColumn,
-        product_column: productColumn || null,
+        date_column: values.dateColumn,
+        value_column: values.valueColumn,
+        product_column: values.productColumn || null,
       });
 
+      message.success('Column mapping saved successfully!');
       onMappingComplete();
     } catch (error: any) {
-      setError('Failed to save column mapping');
+      message.error('Failed to save column mapping');
     } finally {
       setLoading(false);
     }
@@ -70,414 +64,232 @@ const ModernColumnMappingStep: React.FC<ColumnMappingStepProps> = ({
   const getColumnTypeIcon = (columnType: 'date' | 'value' | 'product') => {
     switch (columnType) {
       case 'date':
-        return { icon: CalendarMonth, color: '#8b5cf6' };
+        return { icon: CalendarOutlined, color: '#8b5cf6' };
       case 'value':
-        return { icon: TrendingUp, color: '#06b6d4' };
+        return { icon: LineChartOutlined, color: '#06b6d4' };
       case 'product':
-        return { icon: Category, color: '#f59e0b' };
+        return { icon: AppstoreOutlined, color: '#f59e0b' };
       default:
-        return { icon: Category, color: '#6b7280' };
+        return { icon: AppstoreOutlined, color: '#6b7280' };
     }
   };
 
-  const getColumnLabel = (col: string) => {
-    if (col === dateColumn) return 'DATE';
-    if (col === valueColumn) return 'VALUE';
-    if (col === productColumn) return 'PRODUCT';
+  const getColumnLabel = (col: string, values: any) => {
+    if (col === values.dateColumn) return { label: 'DATE', color: '#8b5cf6' };
+    if (col === values.valueColumn) return { label: 'VALUE', color: '#06b6d4' };
+    if (col === values.productColumn) return { label: 'PRODUCT', color: '#f59e0b' };
     return null;
   };
 
-  const getColumnLabelColor = (col: string) => {
-    if (col === dateColumn) return '#8b5cf6';
-    if (col === valueColumn) return '#06b6d4';
-    if (col === productColumn) return '#f59e0b';
-    return null;
-  };
+  const tableColumns = columns.map((col: string) => ({
+    title: (
+      <Form.Item noStyle shouldUpdate>
+        {({ getFieldsValue }) => {
+          const values = getFieldsValue();
+          const columnInfo = getColumnLabel(col, values);
+          return (
+            <Space direction="vertical" size={0}>
+              <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600 }}>
+                {col}
+              </Text>
+              {columnInfo && (
+                <Tag
+                  color={columnInfo.color}
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    margin: 0,
+                  }}
+                >
+                  {columnInfo.label}
+                </Tag>
+              )}
+            </Space>
+          );
+        }}
+      </Form.Item>
+    ),
+    dataIndex: col,
+    key: col,
+    ellipsis: true,
+    render: (text: any) => (
+      <Text style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+        {String(text || '')}
+      </Text>
+    ),
+  }));
+
+  const mappingCards = [
+    {
+      key: 'dateColumn',
+      title: 'Date Column',
+      description: 'Required - Column containing date/time information',
+      icon: CalendarOutlined,
+      color: '#8b5cf6',
+      required: true,
+    },
+    {
+      key: 'valueColumn',
+      title: 'Value Column',
+      description: 'Required - Column containing numerical values to predict',
+      icon: LineChartOutlined,
+      color: '#06b6d4',
+      required: true,
+    },
+    {
+      key: 'productColumn',
+      title: 'Product Column',
+      description: 'Optional - Column for grouping data by product/category',
+      icon: AppstoreOutlined,
+      color: '#f59e0b',
+      required: false,
+    },
+  ];
 
   return (
-    <Box>
-      <Typography
-        variant="h5"
-        sx={{
-          color: 'rgba(255, 255, 255, 0.9)',
-          fontWeight: 600,
-          mb: 1,
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      {/* Header */}
+      <div>
+        <Title level={3} style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: 8 }}>
+          Column Mapping
+        </Title>
+        <Paragraph style={{ color: 'rgba(255, 255, 255, 0.6)', marginBottom: 0 }}>
+          Map your data columns to the required fields for time series analysis
+        </Paragraph>
+      </div>
+
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={handleSaveMapping}
+        initialValues={{
+          dateColumn: project?.date_column,
+          valueColumn: project?.value_column,
+          productColumn: project?.product_column,
         }}
       >
-        Column Mapping
-      </Typography>
-      <Typography
-        variant="body2"
-        sx={{
-          color: 'rgba(255, 255, 255, 0.6)',
-          mb: 4,
-        }}
-      >
-        Map your data columns to the required fields for time series analysis
-      </Typography>
+        {/* Column Mapping Cards */}
+        <Row gutter={[16, 16]}>
+          {mappingCards.map((mapping) => {
+            const IconComponent = mapping.icon;
+            return (
+              <Col xs={24} md={8} key={mapping.key}>
+                <Card
+                  style={{
+                    background: `rgba(${mapping.color === '#8b5cf6' ? '139, 92, 246' : mapping.color === '#06b6d4' ? '6, 182, 212' : '245, 158, 11'}, 0.1)`,
+                    border: `1px solid rgba(${mapping.color === '#8b5cf6' ? '139, 92, 246' : mapping.color === '#06b6d4' ? '6, 182, 212' : '245, 158, 11'}, 0.3)`,
+                    borderRadius: '16px',
+                    height: '100%',
+                  }}
+                >
+                  <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                    <Space>
+                      <Avatar
+                        style={{
+                          background: `linear-gradient(135deg, ${mapping.color}, ${mapping.color}CC)`,
+                          width: 40,
+                          height: 40,
+                        }}
+                        icon={<IconComponent />}
+                      />
+                      <div>
+                        <Title level={5} style={{ color: 'rgba(255, 255, 255, 0.9)', margin: 0 }}>
+                          {mapping.title}
+                        </Title>
+                        <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: '12px' }}>
+                          {mapping.required ? 'Required' : 'Optional'}
+                        </Text>
+                      </div>
+                    </Space>
 
-      {error && (
-        <Alert 
-          severity="error" 
-          sx={{ 
-            mb: 3,
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            color: '#fca5a5',
-            borderRadius: '12px',
-          }}
-        >
-          {error}
-        </Alert>
-      )}
+                    <Paragraph
+                      style={{
+                        color: 'rgba(255, 255, 255, 0.6)',
+                        fontSize: '13px',
+                        margin: 0,
+                      }}
+                    >
+                      {mapping.description}
+                    </Paragraph>
 
-      {/* Column Mapping Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {/* Date Column */}
-        <Grid item xs={12} md={4}>
-          <Card
-            sx={{
-              background: 'rgba(139, 92, 246, 0.1)',
-              border: `1px solid ${dateColumn ? '#8b5cf6' : 'rgba(139, 92, 246, 0.3)'}`,
-              borderRadius: '16px',
-              p: 3,
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                background: 'rgba(139, 92, 246, 0.15)',
-              },
+                    <Form.Item
+                      name={mapping.key}
+                      rules={mapping.required ? [{ required: true, message: `Please select ${mapping.title.toLowerCase()}!` }] : []}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Select
+                        placeholder={`Select ${mapping.title.toLowerCase()}`}
+                        allowClear={!mapping.required}
+                        style={{ width: '100%' }}
+                      >
+                        {columns.map((col: string) => (
+                          <Option key={col} value={col}>
+                            {col}
+                          </Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </Space>
+                </Card>
+              </Col>
+            );
+          })}
+        </Row>
+
+        {/* Action Button */}
+        <Form.Item>
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={loading}
+            size="large"
+            icon={<CheckCircleOutlined />}
+            style={{
+              background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
+              border: 'none',
+              borderRadius: '12px',
+              height: '48px',
+              paddingLeft: '24px',
+              paddingRight: '24px',
+              fontSize: '16px',
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <Avatar
-                sx={{
-                  background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
-                  width: 40,
-                  height: 40,
-                  mr: 2,
-                }}
-              >
-                <CalendarMonth />
-              </Avatar>
-              <Box>
-                <Typography
-                  variant="h6"
-                  sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600 }}
-                >
-                  Date Column
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{ color: 'rgba(255, 255, 255, 0.6)' }}
-                >
-                  Required
-                </Typography>
-              </Box>
-            </Box>
-
-            <FormControl fullWidth>
-              <Select
-                value={dateColumn}
-                onChange={(e) => setDateColumn(e.target.value)}
-                displayEmpty
-                sx={{
-                  color: 'white',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'rgba(139, 92, 246, 0.3)',
-                  },
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#8b5cf6',
-                  },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#8b5cf6',
-                  },
-                }}
-              >
-                <MenuItem value="">
-                  <em>Select date column</em>
-                </MenuItem>
-                {columns.map((col: string) => (
-                  <MenuItem key={col} value={col}>
-                    {col}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Card>
-        </Grid>
-
-        {/* Value Column */}
-        <Grid item xs={12} md={4}>
-          <Card
-            sx={{
-              background: 'rgba(6, 182, 212, 0.1)',
-              border: `1px solid ${valueColumn ? '#06b6d4' : 'rgba(6, 182, 212, 0.3)'}`,
-              borderRadius: '16px',
-              p: 3,
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                background: 'rgba(6, 182, 212, 0.15)',
-              },
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <Avatar
-                sx={{
-                  background: 'linear-gradient(135deg, #06b6d4, #0891b2)',
-                  width: 40,
-                  height: 40,
-                  mr: 2,
-                }}
-              >
-                <TrendingUp />
-              </Avatar>
-              <Box>
-                <Typography
-                  variant="h6"
-                  sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600 }}
-                >
-                  Value Column
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{ color: 'rgba(255, 255, 255, 0.6)' }}
-                >
-                  Required
-                </Typography>
-              </Box>
-            </Box>
-
-            <FormControl fullWidth>
-              <Select
-                value={valueColumn}
-                onChange={(e) => setValueColumn(e.target.value)}
-                displayEmpty
-                sx={{
-                  color: 'white',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'rgba(6, 182, 212, 0.3)',
-                  },
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#06b6d4',
-                  },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#06b6d4',
-                  },
-                }}
-              >
-                <MenuItem value="">
-                  <em>Select value column</em>
-                </MenuItem>
-                {columns.map((col: string) => (
-                  <MenuItem key={col} value={col}>
-                    {col}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Card>
-        </Grid>
-
-        {/* Product Column */}
-        <Grid item xs={12} md={4}>
-          <Card
-            sx={{
-              background: 'rgba(245, 158, 11, 0.1)',
-              border: `1px solid ${productColumn ? '#f59e0b' : 'rgba(245, 158, 11, 0.3)'}`,
-              borderRadius: '16px',
-              p: 3,
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                background: 'rgba(245, 158, 11, 0.15)',
-              },
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <Avatar
-                sx={{
-                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                  width: 40,
-                  height: 40,
-                  mr: 2,
-                }}
-              >
-                <Category />
-              </Avatar>
-              <Box>
-                <Typography
-                  variant="h6"
-                  sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600 }}
-                >
-                  Product Column
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{ color: 'rgba(255, 255, 255, 0.6)' }}
-                >
-                  Optional
-                </Typography>
-              </Box>
-            </Box>
-
-            <FormControl fullWidth>
-              <Select
-                value={productColumn}
-                onChange={(e) => setProductColumn(e.target.value)}
-                displayEmpty
-                sx={{
-                  color: 'white',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: 'rgba(245, 158, 11, 0.3)',
-                  },
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#f59e0b',
-                  },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#f59e0b',
-                  },
-                }}
-              >
-                <MenuItem value="">
-                  <em>Select product column (optional)</em>
-                </MenuItem>
-                {columns.map((col: string) => (
-                  <MenuItem key={col} value={col}>
-                    {col}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Continue Button */}
-      <Box sx={{ mb: 4 }}>
-        <Button
-          onClick={handleSaveMapping}
-          disabled={!dateColumn || !valueColumn || loading}
-          sx={{
-            background: !dateColumn || !valueColumn || loading
-              ? 'rgba(139, 92, 246, 0.3)'
-              : 'linear-gradient(135deg, #8b5cf6, #a855f7)',
-            color: 'white',
-            px: 4,
-            py: 1.5,
-            borderRadius: '12px',
-            textTransform: 'none',
-            fontWeight: 600,
-            '&:hover': {
-              background: !dateColumn || !valueColumn || loading
-                ? 'rgba(139, 92, 246, 0.3)'
-                : 'linear-gradient(135deg, #7c3aed, #9333ea)',
-            },
-            '&:disabled': {
-              color: 'rgba(255, 255, 255, 0.5)',
-            },
-          }}
-          startIcon={<CheckCircle />}
-        >
-          {loading ? 'Saving...' : 'Save Mapping & Continue'}
-        </Button>
-      </Box>
+            {loading ? 'Saving...' : 'Save Mapping & Continue'}
+          </Button>
+        </Form.Item>
+      </Form>
 
       {/* Data Preview */}
       <Card
-        sx={{
+        title="Data Preview"
+        style={{
           background: 'rgba(30, 41, 59, 0.3)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '16px',
-          overflow: 'hidden',
         }}
       >
-        <Box sx={{ p: 3, pb: 0 }}>
-          <Typography
-            variant="h6"
-            sx={{
-              color: 'rgba(255, 255, 255, 0.9)',
-              fontWeight: 600,
-              mb: 2,
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Alert
+            message="Column Mapping Preview"
+            description="First 5 rows of your data with column mappings highlighted"
+            type="info"
+            showIcon
+          />
+          
+          <Table
+            columns={tableColumns}
+            dataSource={sampleData.slice(0, 5).map((row: any, index: number) => ({ ...row, key: index }))}
+            pagination={false}
+            scroll={{ x: true }}
+            size="small"
+            style={{ 
+              background: 'rgba(30, 41, 59, 0.2)',
             }}
-          >
-            Data Preview
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              color: 'rgba(255, 255, 255, 0.6)',
-              mb: 3,
-            }}
-          >
-            First 5 rows of your data with column mappings highlighted
-          </Typography>
-        </Box>
-        
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                {columns.map((col: string) => (
-                  <TableCell
-                    key={col}
-                    sx={{
-                      backgroundColor: 'rgba(30, 41, 59, 0.5)',
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                      py: 2,
-                    }}
-                  >
-                    <Box>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{
-                          color: 'rgba(255, 255, 255, 0.9)',
-                          fontWeight: 600,
-                          mb: 1,
-                        }}
-                      >
-                        {col}
-                      </Typography>
-                      {getColumnLabel(col) && (
-                        <Chip
-                          label={getColumnLabel(col)}
-                          size="small"
-                          sx={{
-                            backgroundColor: `${getColumnLabelColor(col)}20`,
-                            color: getColumnLabelColor(col),
-                            fontSize: '10px',
-                            height: 20,
-                            fontWeight: 600,
-                          }}
-                        />
-                      )}
-                    </Box>
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sampleData.slice(0, 5).map((row: any, index: number) => (
-                <TableRow key={index}>
-                  {columns.map((col: string) => (
-                    <TableCell
-                      key={col}
-                      sx={{
-                        color: 'rgba(255, 255, 255, 0.8)',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                        backgroundColor: getColumnLabel(col) 
-                          ? `${getColumnLabelColor(col)}05` 
-                          : 'transparent',
-                      }}
-                    >
-                      {String(row[col] || '')}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+          />
+        </Space>
       </Card>
-    </Box>
+    </Space>
   );
 };
 
-export default ModernColumnMappingStep;
+export default ColumnMappingStep;
