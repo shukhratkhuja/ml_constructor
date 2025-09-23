@@ -1,0 +1,22 @@
+Registration (Login)
+Session based  
+
+1. source toggle db/file: ({source_type: (DB/File)}) 
+    If file:
+        File upload (types: csv, json, xlsx)
+    If DB:
+        Choose from saved connections or add connection: test button and save button after adding connection
+
+    (logic get data and columns)
+
+2. Save columns and data temporary location.
+
+3. Choosing date, value, product(optional) columns
+4. Feature Generation:
+    - date features (Checkbox - separate Dialog)
+    - numerical features (Like calendar view Dialog for each numerical feature)
+5. Test Ratio (rate picker 0-100)
+6. CV Folds (Radio button)
+
+
+
