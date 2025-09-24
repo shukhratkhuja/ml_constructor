@@ -39,7 +39,7 @@ const Register: React.FC = () => {
     setLoading(true);
     try {
       await register(values.email, values.password);
-      navigate('/dashboard');
+      navigate('/api/auth/register');
     } catch (error) {
       // Error is handled in AuthContext
     } finally {
@@ -253,7 +253,7 @@ const Register: React.FC = () => {
                   <Text style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
                     Already have an account?{' '}
                     <Link
-                      to="/login"
+                      to="api/auth/login"
                       style={{
                         color: '#8b5cf6',
                         textDecoration: 'none',

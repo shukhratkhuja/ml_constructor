@@ -4,7 +4,6 @@ import { ConfigProvider, theme, App } from 'antd';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
-import Dashboard from './components/Dashboard/Dashboard';
 import ProjectDetail from './components/Project/ProjectDetail';
 
 const { darkAlgorithm } = theme;
@@ -54,12 +53,7 @@ const antdTheme = {
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
-  return token ? <>{children}</> : <Navigate to="/login" />;
-}
-
-function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth();
-  return token ? <Navigate to="/dashboard" /> : <>{children}</>;
+  return token ? <>{children}</> : <Navigate to="/api/auth/login" />;
 }
 
 function MainApp() {
@@ -70,7 +64,7 @@ function MainApp() {
           <Router>
             <Routes>
               <Route 
-                path="/login" 
+                path="/api//auth/login" 
                 element={
                   <PublicRoute>
                     <Login />
@@ -78,21 +72,14 @@ function MainApp() {
                 } 
               />
               <Route 
-                path="/register" 
+                path="/api/auth/register" 
                 element={
                   <PublicRoute>
                     <Register />
                   </PublicRoute>
                 } 
               />
-              <Route 
-                path="/dashboard" 
-                element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                } 
-              />
+
               <Route 
                 path="/projects/:projectId" 
                 element={
@@ -101,7 +88,6 @@ function MainApp() {
                   </ProtectedRoute>
                 } 
               />
-              <Route path="/" element={<Navigate to="/dashboard" />} />
             </Routes>
           </Router>
         </AuthProvider>
