@@ -24,8 +24,7 @@ import {
   BarChartOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import axios from 'axios';
+import api from '../../../config/axios';
 import dayjs from 'dayjs';
 
 const { Title, Text, Paragraph } = Typography;
@@ -61,7 +60,7 @@ const ModelTrainingStep: React.FC<ModelTrainingStepProps> = ({
   const fetchModels = async () => {
     setModelsLoading(true);
     try {
-      const response = await axios.get(`/api/models/projects/${project.id}/models`);
+      const response = await api.get(`/api/models/projects/${project.id}/models`);
       setModels(response.data);
       if (response.data.length > 0) {
         setSelectedModel(response.data[0]);
@@ -83,7 +82,7 @@ const ModelTrainingStep: React.FC<ModelTrainingStepProps> = ({
       });
 
       // Train model
-      const response = await axios.post(`/api/models/projects/${project.id}/train-model`, {
+      const response = await api.post(`/api/models/projects/${project.id}/train-model`, {
         name: `Model ${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
         model_type: 'random_forest',
         parameters: {

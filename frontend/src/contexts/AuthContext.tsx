@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { message } from 'antd';
-import axios from 'axios';
+import api from '../config/axios';
 
 interface User {
   id: number;
@@ -37,35 +37,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
 
-  // Set up axios interceptor
   useEffect(() => {
     if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       fetchUser();
     } else {
       setLoading(false);
     }
-
-    // Add response interceptor for handling token expiration
-    const interceptor = axios.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response?.status === 401) {
-          logout();
-          message.error('Session expired. Please login again.');
-        }
-        return Promise.reject(error);
-      }
-    );
-
-    return () => {
-      axios.interceptors.response.eject(interceptor);
-    };
   }, [token]);
 
   const fetchUser = async () => {
     try {
-      const response = await axios.get('/api/auth/me');
+      const response = await api.get('/api/auth/me');
       setUser(response.data);
     } catch (error) {
       console.error('Failed to fetch user:', error);
@@ -77,12 +59,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await axios.post('/api/auth/login', { email, password });
+      const response = await api.post('/api/auth/login', { email, password });
       const { access_token } = response.data;
       
       localStorage.setItem('token', access_token);
       setToken(access_token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       
       await fetchUser();
       message.success('Login successful!');
@@ -95,7 +76,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const register = async (email: string, password: string) => {
     try {
-      await axios.post('/api/auth/register', { email, password });
+      await api.post('/api/auth/register', { email, password });
       message.success('Registration successful!');
       // After successful registration, automatically log in
       await login(email, password);
@@ -110,7 +91,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
-    delete axios.defaults.headers.common['Authorization'];
     message.success('Logged out successfully');
   };
 

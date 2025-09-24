@@ -20,6 +20,7 @@ import {
   AppstoreOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons';
+import api from '../../../config/axios';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -172,12 +173,15 @@ const ColumnMappingStep: React.FC<ColumnMappingStepProps> = ({
         <Row gutter={[16, 16]}>
           {mappingCards.map((mapping) => {
             const IconComponent = mapping.icon;
+            const rgbaColor = mapping.color === '#8b5cf6' ? '139, 92, 246' : 
+                             mapping.color === '#06b6d4' ? '6, 182, 212' : '245, 158, 11';
+            
             return (
               <Col xs={24} md={8} key={mapping.key}>
                 <Card
                   style={{
-                    background: `rgba(${mapping.color === '#8b5cf6' ? '139, 92, 246' : mapping.color === '#06b6d4' ? '6, 182, 212' : '245, 158, 11'}, 0.1)`,
-                    border: `1px solid rgba(${mapping.color === '#8b5cf6' ? '139, 92, 246' : mapping.color === '#06b6d4' ? '6, 182, 212' : '245, 158, 11'}, 0.3)`,
+                    background: `rgba(${rgbaColor}, 0.1)`,
+                    border: `1px solid rgba(${rgbaColor}, 0.3)`,
                     borderRadius: '16px',
                     height: '100%',
                   }}

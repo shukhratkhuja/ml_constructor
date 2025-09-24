@@ -30,7 +30,7 @@ import {
   ApiOutlined,
 } from '@ant-design/icons';
 import { UploadFile, UploadProps } from 'antd/es/upload/interface';
-import axios from 'axios';
+import api from '../../../config/axios';
 
 const { Title, Text, Paragraph } = Typography;
 const { Dragger } = Upload;
@@ -84,7 +84,7 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
 
   const fetchDbConnections = async () => {
     try {
-      const response = await axios.get('/api/data-source/db-connections');
+      const response = await api.get('/api/data-source/db-connections');
       setDbConnections(response.data);
     } catch (error) {
       message.error('Failed to fetch database connections');
@@ -96,7 +96,7 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
     if (!selectedConnection) return;
     
     try {
-      const response = await axios.get(`/api/data-source/db-connections/${selectedConnection}/tables`);
+      const response = await api.get(`/api/data-source/db-connections/${selectedConnection}/tables`);
       setTables(response.data.tables);
     } catch (error) {
       message.error('Failed to fetch tables');
@@ -112,7 +112,7 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
     formData.append('file', file);
 
     try {
-      const response = await axios.post('/api/data-source/upload-file', formData, {
+      const response = await api.post('/api/data-source/upload-file', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -139,7 +139,7 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
 
     setLoading(true);
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `/api/data-source/db-connections/${selectedConnection}/tables/${selectedTable}/preview`
       );
 
@@ -161,7 +161,7 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
 
   const handleTestConnection = async (values: any) => {
     try {
-      await axios.post('/api/data-source/test-db-connection', values);
+      await api.post('/api/data-source/test-db-connection', values);
       message.success('Connection successful!');
     } catch (error: any) {
       message.error(error.response?.data?.detail || 'Connection failed');
@@ -170,7 +170,7 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
 
   const handleSaveConnection = async (values: any) => {
     try {
-      await axios.post('/api/data-source/db-connections', values);
+      await api.post('/api/data-source/db-connections', values);
       message.success('Connection saved successfully!');
       setConnectionModalVisible(false);
       form.resetFields();
@@ -206,6 +206,11 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
     dataIndex: col,
     key: col,
     ellipsis: true,
+    render: (text: any) => (
+      <Text style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+        {String(text || '')}
+      </Text>
+    ),
   }));
 
   return (
@@ -301,7 +306,7 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
                 message="File Ready"
                 description={
                   <Space>
-                    {getFileIcon(fileList[0].name)}
+                    {getFileIcon(fileList[0].name!)}
                     <Text style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
                       {fileList[0].name}
                     </Text>

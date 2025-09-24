@@ -23,7 +23,7 @@ import {
   CheckCircleOutlined,
   LoadingOutlined,
 } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../../config/axios';
 
 import DataLoadingStep from './steps/DataLoadingStep';
 import ColumnMappingStep from './steps/ColumnMappingStep';
@@ -91,7 +91,7 @@ const ProjectDetail: React.FC = () => {
     if (!projectId) return;
     
     try {
-      const response = await axios.get(`/api/projects/${projectId}`);
+      const response = await api.get(`/api/projects/${projectId}`);
       setProject(response.data);
       
       // Determine current step and completed steps based on project data
@@ -125,7 +125,7 @@ const ProjectDetail: React.FC = () => {
     if (!projectId) return;
     
     try {
-      const response = await axios.put(`/api/projects/${projectId}`, updates);
+      const response = await api.put(`/api/projects/${projectId}`, updates);
       setProject(response.data);
       return response.data;
     } catch (error) {

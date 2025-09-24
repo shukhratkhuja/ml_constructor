@@ -21,7 +21,7 @@ import {
   CheckCircleOutlined,
   NumberOutlined,
 } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../../../config/axios';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -109,7 +109,7 @@ const FeatureGenerationStep: React.FC<FeatureGenerationStepProps> = ({
   const handleGenerateFeatures = async () => {
     setLoading(true);
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `/api/features/projects/${project.id}/generate-features`,
         {
           date_features: dateFeatures,
@@ -179,6 +179,16 @@ const FeatureGenerationStep: React.FC<FeatureGenerationStepProps> = ({
 
   const getSelectedNumbers = (type: string) => {
     return numericalFeatures[type as keyof typeof numericalFeatures] as number[];
+  };
+
+  const getRgbaColor = (color: string) => {
+    switch (color) {
+      case '#8b5cf6': return '139, 92, 246';
+      case '#06b6d4': return '6, 182, 212';
+      case '#f59e0b': return '245, 158, 11';
+      case '#10b981': return '16, 185, 129';
+      default: return '139, 92, 246';
+    }
   };
 
   return (
@@ -275,12 +285,13 @@ const FeatureGenerationStep: React.FC<FeatureGenerationStepProps> = ({
           {numericalFeatureTypes.map((featureType) => {
             const IconComponent = featureType.icon;
             const selectedNumbers = getSelectedNumbers(featureType.key);
+            const rgbaColor = getRgbaColor(featureType.color);
             
             return (
               <Col xs={24} sm={12} md={6} key={featureType.key}>
                 <Card
                   style={{
-                    background: `rgba(${featureType.color === '#8b5cf6' ? '139, 92, 246' : featureType.color === '#06b6d4' ? '6, 182, 212' : featureType.color === '#f59e0b' ? '245, 158, 11' : '16, 185, 129'}, 0.1)`,
+                    background: `rgba(${rgbaColor}, 0.1)`,
                     border: `1px solid ${featureType.color}33`,
                     height: '100%',
                   }}
@@ -326,8 +337,7 @@ const FeatureGenerationStep: React.FC<FeatureGenerationStepProps> = ({
                             <Tag 
                               key={num} 
                               color={featureType.color} 
-                              size="small" 
-                              style={{ margin: '2px' }}
+                              style={{ margin: '2px', fontSize: '11px' }}
                             >
                               {num}
                             </Tag>

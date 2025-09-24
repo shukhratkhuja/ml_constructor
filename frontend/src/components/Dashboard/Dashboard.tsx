@@ -32,7 +32,7 @@ import {
   DeleteOutlined,
   EditOutlined,
 } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../../config/axios';
 import { useAuth } from '../../contexts/AuthContext';
 import dayjs from 'dayjs';
 
@@ -67,7 +67,7 @@ const Dashboard: React.FC = () => {
 
   const fetchProjects = async () => {
     try {
-      const response = await axios.get('/api/projects');
+      const response = await api.get('/api/projects');
       setProjects(response.data);
     } catch (error) {
       message.error('Failed to fetch projects');
@@ -80,7 +80,7 @@ const Dashboard: React.FC = () => {
   const handleCreateProject = async (values: { name: string; description?: string }) => {
     setCreating(true);
     try {
-      const response = await axios.post('/api/projects', values);
+      const response = await api.post('/api/projects', values);
       setProjects([response.data, ...projects]);
       setModalVisible(false);
       form.resetFields();
@@ -95,7 +95,7 @@ const Dashboard: React.FC = () => {
 
   const handleDeleteProject = async (projectId: number) => {
     try {
-      await axios.delete(`/api/projects/${projectId}`);
+      await api.delete(`/api/projects/${projectId}`);
       setProjects(projects.filter(p => p.id !== projectId));
       message.success('Project deleted successfully!');
     } catch (error) {
