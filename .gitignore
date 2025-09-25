@@ -1,5 +1,5 @@
 .venv_constructor
-
+*.xlsx
 # Python specific
 __pycache__/
 *.pyc
