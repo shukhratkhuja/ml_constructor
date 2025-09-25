@@ -13,7 +13,6 @@ import {
   Divider,
 } from 'antd';
 import {
-  UserOutlined,
   LockOutlined,
   EyeInvisibleOutlined,
   EyeTwoTone,
@@ -39,7 +38,7 @@ const Register: React.FC = () => {
     setLoading(true);
     try {
       await register(values.email, values.password);
-      navigate('/api/auth/register');
+      navigate('/dashboard');
     } catch (error) {
       // Error is handled in AuthContext
     } finally {
@@ -253,7 +252,7 @@ const Register: React.FC = () => {
                   <Text style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
                     Already have an account?{' '}
                     <Link
-                      to="api/auth/login"
+                      to="/login"
                       style={{
                         color: '#8b5cf6',
                         textDecoration: 'none',

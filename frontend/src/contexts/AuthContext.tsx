@@ -47,8 +47,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const fetchUser = async () => {
     try {
-      // API endpoint to'g'ri yo'li
-      const response = await api.get('/api/auth/me');
+      const response = await api.get('/auth/me');
       setUser(response.data);
       console.log('User fetched successfully:', response.data);
     } catch (error) {
@@ -64,8 +63,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoading(true);
       console.log('Attempting login with:', { email });
       
-      // API endpoint to'g'ri yo'li - backend da /api/auth/login bor
-      const response = await api.post('/api/auth/login', { 
+      const response = await api.post('/auth/login', { 
         email: email.trim(), 
         password: password.trim() 
       });
@@ -78,30 +76,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
         throw new Error('No access token received from server');
       }
       
-      // Token ni saqlash
+      // Store token
       localStorage.setItem('token', access_token);
       setToken(access_token);
       
-      // Keyingi requestlar uchun token o'rnatish
+      // Set token for future requests
       api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       
-      // User ma'lumotlarini olish
+      // Fetch user data
       await fetchUser();
       
-      message.success('Muvaffaqiyatli kirildi!');
+      message.success('Login successful!');
       console.log('Login successful');
     } catch (error: any) {
       console.error('Login error:', error);
       console.error('Error response:', error.response?.data);
       
-      let errorMessage = 'Kirish amalga oshmadi';
+      let errorMessage = 'Login failed';
       
       if (error.response?.data?.detail) {
         errorMessage = error.response.data.detail;
       } else if (error.response?.status === 401) {
-        errorMessage = 'Email yoki parol noto\'g\'ri';
+        errorMessage = 'Incorrect email or password';
       } else if (error.response?.status >= 500) {
-        errorMessage = 'Server xatosi. Keyinroq urinib ko\'ring';
+        errorMessage = 'Server error. Please try again later';
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -118,31 +116,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoading(true);
       console.log('Attempting register with:', { email });
       
-      // API endpoint to'g'ri yo'li - backend da /api/auth/register bor
-      const response = await api.post('/api/auth/register', { 
+      const response = await api.post('/auth/register', { 
         email: email.trim(), 
         password: password.trim() 
       });
       
       console.log('Register response:', response.data);
       
-      message.success('Ro\'yxatdan o\'tish muvaffaqiyatli!');
+      message.success('Registration successful!');
       
-      // Ro'yxatdan o'tgandan keyin avtomatik kirish
+      // Auto login after registration
       await login(email, password);
     } catch (error: any) {
       console.error('Register error:', error);
       console.error('Error response:', error.response?.data);
       
-      let errorMessage = 'Ro\'yxatdan o\'tish amalga oshmadi';
+      let errorMessage = 'Registration failed';
       
       if (error.response?.data?.detail) {
         errorMessage = error.response.data.detail;
       } else if (error.response?.status === 400) {
-        errorMessage = 'Bu email allaqachon ro\'yxatdan o\'tgan';
+        errorMessage = 'This email is already registered';
       } else if (error.response?.status >= 500) {
-        errorMessage = 'Server xatosi. Keyinroq urinib ko\'ring';
-      } else if (error.message && error.message !== 'Kirish amalga oshmadi') {
+        errorMessage = 'Server error. Please try again later';
+      } else if (error.message && error.message !== 'Login failed') {
         errorMessage = error.message;
       }
       
@@ -158,7 +155,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setToken(null);
     setUser(null);
     delete api.defaults.headers.common['Authorization'];
-    message.success('Muvaffaqiyatli chiqildi');
+    message.success('Logged out successfully');
     console.log('User logged out');
   };
 

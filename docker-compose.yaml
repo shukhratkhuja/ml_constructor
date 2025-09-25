@@ -14,6 +14,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - ml_constructor_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   backend:
     build:
@@ -27,15 +32,20 @@ services:
       DB_PASSWORD: password
       DB_NAME: ml_constructor
       SECRET_KEY: your-super-secret-key-change-this-in-production
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      UPLOAD_DIR: uploads
+      MAX_FILE_SIZE: 104857600
     ports:
       - "8000:8000"
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/saved_models:/app/saved_models
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - ml_constructor_network
+    restart: unless-stopped
 
   frontend:
     build:
@@ -48,6 +58,7 @@ services:
       - backend
     networks:
       - ml_constructor_network
+    restart: unless-stopped
 
 volumes:
   postgres_data:

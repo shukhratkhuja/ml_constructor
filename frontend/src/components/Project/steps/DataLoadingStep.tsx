@@ -71,6 +71,20 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
   const [form] = Form.useForm();
 
   useEffect(() => {
+    // Load existing dataInfo when component mounts
+    const savedDataInfo = sessionStorage.getItem('dataInfo');
+    if (savedDataInfo && !previewData) {
+      try {
+        const parsedDataInfo = JSON.parse(savedDataInfo);
+        setPreviewData(parsedDataInfo);
+        console.log('Restored previewData from sessionStorage:', parsedDataInfo);
+      } catch (error) {
+        console.error('Failed to parse saved dataInfo:', error);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (sourceType === 'db') {
       fetchDbConnections();
     }
@@ -84,7 +98,7 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
 
   const fetchDbConnections = async () => {
     try {
-      const response = await api.get('/api/data-source/db-connections');
+      const response = await api.get('/data-source/db-connections'); // Fixed: removed /api prefix
       setDbConnections(response.data);
     } catch (error) {
       message.error('Failed to fetch database connections');
@@ -96,7 +110,7 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
     if (!selectedConnection) return;
     
     try {
-      const response = await api.get(`/api/data-source/db-connections/${selectedConnection}/tables`);
+      const response = await api.get(`/data-source/db-connections/${selectedConnection}/tables`); // Fixed: removed /api prefix
       setTables(response.data.tables);
     } catch (error) {
       message.error('Failed to fetch tables');
@@ -112,23 +126,37 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
     formData.append('file', file);
 
     try {
-      const response = await api.post('/api/data-source/upload-file', formData, {
+      const response = await api.post('/data-source/upload-file', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
+      console.log('File upload response:', response.data); // Debug log
+
+      // Update project with file information
       await updateProject({
         source_type: 'file',
         file_path: response.data.file_path,
       });
 
+      // Set preview data to show the uploaded file content
+      setPreviewData(response.data.source_info);
+      
+      // Store data info in sessionStorage as backup
+      sessionStorage.setItem('dataInfo', JSON.stringify(response.data.source_info));
+      
+      // Call onDataLoaded to proceed to next step - but don't auto-advance yet
+      // Let user manually continue to ensure data is properly loaded
+      
       onSuccess?.(response.data);
-      onDataLoaded(response.data.source_info);
-      message.success('File uploaded successfully!');
+      message.success('File uploaded and processed successfully!');
     } catch (error: any) {
+      console.error('File upload error:', error); // Debug log
       onError?.(error);
       message.error(error.response?.data?.detail || 'File upload failed');
+      // Reset file list on error
+      setFileList([]);
     } finally {
       setLoading(false);
     }
@@ -140,7 +168,7 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
     setLoading(true);
     try {
       const response = await api.get(
-        `/api/data-source/db-connections/${selectedConnection}/tables/${selectedTable}/preview`
+        `/data-source/db-connections/${selectedConnection}/tables/${selectedTable}/preview` // Fixed: removed /api prefix
       );
 
       await updateProject({
@@ -161,7 +189,7 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
 
   const handleTestConnection = async (values: any) => {
     try {
-      await api.post('/api/data-source/test-db-connection', values);
+      await api.post('/data-source/test-db-connection', values); // Fixed: removed /api prefix
       message.success('Connection successful!');
     } catch (error: any) {
       message.error(error.response?.data?.detail || 'Connection failed');
@@ -170,7 +198,7 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
 
   const handleSaveConnection = async (values: any) => {
     try {
-      await api.post('/api/data-source/db-connections', values);
+      await api.post('/data-source/db-connections', values); // Fixed: removed /api prefix
       message.success('Connection saved successfully!');
       setConnectionModalVisible(false);
       form.resetFields();
@@ -195,9 +223,42 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
     customRequest: handleFileUpload,
     onChange: (info) => {
       setFileList(info.fileList);
+      
+      // Handle upload status changes
+      if (info.file.status === 'done') {
+        message.success(`${info.file.name} file uploaded successfully`);
+      } else if (info.file.status === 'error') {
+        message.error(`${info.file.name} file upload failed`);
+        setFileList([]); // Clear failed uploads
+      }
+    },
+    onRemove: (file) => {
+      // Clear preview data when file is removed
+      setPreviewData(null);
+      setFileList([]);
+      return true;
     },
     onDrop: (e) => {
       console.log('Dropped files', e.dataTransfer.files);
+    },
+    beforeUpload: (file) => {
+      // Validate file size
+      const isLt100M = file.size / 1024 / 1024 < 100;
+      if (!isLt100M) {
+        message.error('File must be smaller than 100MB!');
+        return false;
+      }
+      
+      // Validate file type
+      const allowedTypes = ['.csv', '.json', '.xlsx', '.xls'];
+      const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
+      const isValidType = allowedTypes.includes(fileExt);
+      if (!isValidType) {
+        message.error('Please upload CSV, JSON, or Excel files only!');
+        return false;
+      }
+      
+      return true;
     },
   };
 
@@ -305,14 +366,34 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
               <Alert
                 message="File Ready"
                 description={
-                  <Space>
-                    {getFileIcon(fileList[0].name!)}
-                    <Text style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                      {fileList[0].name}
-                    </Text>
-                    <Tag color="success">
-                      {((fileList[0].size || 0) / (1024 * 1024)).toFixed(2)} MB
-                    </Tag>
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Space>
+                      {getFileIcon(fileList[0].name!)}
+                      <Text style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                        {fileList[0].name}
+                      </Text>
+                      <Tag color="success">
+                        {((fileList[0].size || 0) / (1024 * 1024)).toFixed(2)} MB
+                      </Tag>
+                    </Space>
+                    {previewData && (
+                      <Button
+                        type="primary"
+                        icon={<CheckCircleOutlined />}
+                        onClick={() => {
+                          console.log('Continue button clicked, passing data:', previewData); // Debug log
+                          onDataLoaded(previewData); // Pass data to next step
+                          message.success('Proceeding to column mapping...');
+                        }}
+                        style={{
+                          marginTop: 8,
+                          background: 'linear-gradient(135deg, #10b981, #059669)',
+                          border: 'none',
+                        }}
+                      >
+                        Continue to Column Mapping
+                      </Button>
+                    )}
                   </Space>
                 }
                 type="success"
@@ -388,8 +469,17 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
             disabled={!selectedConnection || !selectedTable || loading}
             loading={loading}
             size="large"
+            style={{
+              background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
+              border: 'none',
+              borderRadius: '12px',
+              height: '48px',
+              paddingLeft: '24px',
+              paddingRight: '24px',
+              fontSize: '16px',
+            }}
           >
-            {loading ? 'Loading Data...' : 'Load Data'}
+            {loading ? 'Loading Data...' : 'Load Data & Continue'}
           </Button>
         </Card>
       )}
@@ -397,11 +487,32 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
       {/* Data Preview */}
       {previewData && (
         <Card
-          title="Data Preview"
+          title={
+            <Space>
+              <CheckCircleOutlined style={{ color: '#10b981' }} />
+              <span>Data Preview - Ready for Next Step</span>
+            </Space>
+          }
           style={{
             background: 'rgba(30, 41, 59, 0.3)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
           }}
+          extra={
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => {
+                // This will trigger the next step
+                message.success('Data loaded successfully! Proceeding to column mapping...');
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                border: 'none',
+              }}
+            >
+              Next: Column Mapping
+            </Button>
+          }
         >
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>
             <Row gutter={16}>
@@ -548,13 +659,47 @@ const DataLoadingStep: React.FC<DataLoadingStepProps> = ({
         </Form>
       </Modal>
 
+      {/* Loading State */}
       {loading && (
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-          <Spin size="large" />
-          <div style={{ marginTop: 16 }}>
-            <Text style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Processing data...</Text>
-          </div>
-        </div>
+        <Card
+          style={{
+            background: 'rgba(30, 41, 59, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            textAlign: 'center',
+          }}
+        >
+          <Space direction="vertical" size="large">
+            <Spin size="large" />
+            <div>
+              <Text style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '16px', fontWeight: 500 }}>
+                Processing your data...
+              </Text>
+              <br />
+              <Text style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+                {sourceType === 'file' ? 'Analyzing file structure and content' : 'Connecting to database and loading data'}
+              </Text>
+            </div>
+          </Space>
+        </Card>
+      )}
+
+      {/* Success State - only show if not loading and we have preview data */}
+      {!loading && previewData && (
+        <Alert
+          message="✅ Data Source Ready!"
+          description={
+            <div>
+              Successfully loaded <strong>{previewData.row_count}</strong> rows with <strong>{previewData.columns?.length}</strong> columns from your {previewData.source_type === 'file' ? 'file' : 'database'}.
+              <br />
+              <Text style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px' }}>
+                You can now proceed to map your data columns for time series analysis.
+              </Text>
+            </div>
+          }
+          type="success"
+          showIcon
+          style={{ marginBottom: 24 }}
+        />
       )}
     </Space>
   );

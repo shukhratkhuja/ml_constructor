@@ -110,7 +110,7 @@ const FeatureGenerationStep: React.FC<FeatureGenerationStepProps> = ({
     setLoading(true);
     try {
       const response = await api.post(
-        `/api/features/projects/${project.id}/generate-features`,
+        `/features/projects/${project.id}/generate-features`, // Fixed: removed /api prefix
         {
           date_features: dateFeatures,
           numerical_features: numericalFeatures,

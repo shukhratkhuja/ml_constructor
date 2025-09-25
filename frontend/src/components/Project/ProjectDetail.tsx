@@ -23,7 +23,7 @@ import {
   CheckCircleOutlined,
   LoadingOutlined,
 } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../../config/axios';
 
 import DataLoadingStep from './steps/DataLoadingStep';
 import ColumnMappingStep from './steps/ColumnMappingStep';
@@ -83,15 +83,33 @@ const ProjectDetail: React.FC = () => {
   const navigate = useNavigate();
   const { projectId } = useParams<{ projectId: string }>();
 
+  // Add debugging
+  console.log('ProjectDetail rendering, projectId:', projectId);
+  console.log('Project state:', project);
+  console.log('Loading state:', loading);
+
   useEffect(() => {
+    console.log('ProjectDetail useEffect triggered');
     fetchProject();
+    
+    // Try to restore dataInfo from sessionStorage if it exists
+    const savedDataInfo = sessionStorage.getItem('dataInfo');
+    if (savedDataInfo && !dataInfo) {
+      try {
+        const parsedDataInfo = JSON.parse(savedDataInfo);
+        setDataInfo(parsedDataInfo);
+        console.log('Restored dataInfo from sessionStorage:', parsedDataInfo);
+      } catch (error) {
+        console.error('Failed to parse saved dataInfo:', error);
+      }
+    }
   }, [projectId]);
 
   const fetchProject = async () => {
     if (!projectId) return;
     
     try {
-      const response = await axios.get(`/api/projects/${projectId}`);
+      const response = await api.get(`/projects/${projectId}`);
       setProject(response.data);
       
       // Determine current step and completed steps based on project data
@@ -125,7 +143,7 @@ const ProjectDetail: React.FC = () => {
     if (!projectId) return;
     
     try {
-      const response = await axios.put(`/api/projects/${projectId}`, updates);
+      const response = await api.put(`/projects/${projectId}`, updates);
       setProject(response.data);
       return response.data;
     } catch (error) {

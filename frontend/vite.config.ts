@@ -14,9 +14,12 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    host: '0.0.0.0', // Allow external connections
     proxy: {
       '/api': {
-        target: 'http://backend:8000', // Use backend service name for Docker
+        target: process.env.NODE_ENV === 'production' 
+          ? 'http://backend:8000'  // Docker service name
+          : 'http://localhost:8000', // Local development
         changeOrigin: true,
         secure: false,
         configure: (proxy, _options) => {
