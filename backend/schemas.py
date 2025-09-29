@@ -64,14 +64,18 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     source_type: Optional[str] = None
+    file_path: Optional[str] = None
     db_connection_id: Optional[int] = None
     table_name: Optional[str] = None
     query: Optional[str] = None
     date_column: Optional[str] = None
     value_column: Optional[str] = None
     product_column: Optional[str] = None
+    aggregation_period: Optional[str] = None
+    aggregation_completed: Optional[bool] = None
     date_features: Optional[Dict[str, Any]] = None
     numerical_features: Optional[Dict[str, Any]] = None
+    features_generated: Optional[bool] = None
     test_ratio: Optional[float] = None
     cv_folds: Optional[int] = None
 
@@ -83,12 +87,44 @@ class Project(BaseModel):
     date_column: Optional[str]
     value_column: Optional[str]
     product_column: Optional[str]
+    aggregation_period: Optional[str]
+    aggregation_completed: bool
     date_features: Optional[Dict[str, Any]]
     numerical_features: Optional[Dict[str, Any]]
+    features_generated: bool
     test_ratio: Optional[float]
     cv_folds: Optional[int]
     created_at: datetime
     updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Additional File schemas
+class AdditionalFileCreate(BaseModel):
+    file_name: str
+    file_path: str
+    file_type: str
+
+class AdditionalFileColumnMapping(BaseModel):
+    additional_file_id: int
+    date_column: str
+    product_column: Optional[str] = None  # NEW: Product column for matching
+    selected_columns: List[str]
+    column_aggregations: Dict[str, str]  # {column_name: aggregation_function}
+    fill_method: str = 'zero'
+
+class AdditionalFile(BaseModel):
+    id: int
+    project_id: int
+    file_name: str
+    file_path: str
+    file_type: str
+    date_column: Optional[str]
+    selected_columns: Optional[List[str]]
+    column_aggregations: Optional[Dict[str, str]]
+    fill_method: str
+    uploaded_at: datetime
     
     class Config:
         from_attributes = True
@@ -104,6 +140,11 @@ class ColumnMapping(BaseModel):
     date_column: str
     value_column: str
     product_column: Optional[str] = None
+
+class AggregationConfig(BaseModel):
+    period: str  # 'daily', 'weekly', 'monthly'
+    main_value_aggregation: str  # 'mean', 'sum', 'max', 'min'
+    additional_file_aggregations: Optional[List[Dict[str, Any]]] = None
 
 class DateFeatures(BaseModel):
     month: bool = False
@@ -139,6 +180,19 @@ class MLModel(BaseModel):
     model_type: str
     parameters: Optional[Dict[str, Any]]
     metrics: Optional[Dict[str, Any]]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Aggregated Data schemas
+class AggregatedDataResponse(BaseModel):
+    id: int
+    project_id: int
+    period: str
+    row_count: int
+    columns: List[str]
+    sample_data: List[Dict[str, Any]]
     created_at: datetime
     
     class Config:

@@ -73,10 +73,10 @@ const FeatureGenerationStep: React.FC<FeatureGenerationStepProps> = ({
   useEffect(() => {
     // Load existing features if they exist
     if (project?.date_features) {
-      setDateFeatures({ ...dateFeatures, ...project.date_features });
+      setDateFeatures(prev => ({ ...prev, ...project.date_features }));
     }
     if (project?.numerical_features) {
-      setNumericalFeatures({ ...numericalFeatures, ...project.numerical_features });
+      setNumericalFeatures(prev => ({ ...prev, ...project.numerical_features }));
     }
   }, [project]);
 
@@ -89,7 +89,7 @@ const FeatureGenerationStep: React.FC<FeatureGenerationStepProps> = ({
 
   const handleNumberSelection = (number: number) => {
     setNumericalFeatures(prev => {
-      const currentArray = prev[currentNumberType as keyof typeof prev] as number[];
+      const currentArray = (prev[currentNumberType as keyof typeof prev] as number[]) || [];
       const newArray = currentArray.includes(number)
         ? currentArray.filter(n => n !== number)
         : [...currentArray, number].sort((a, b) => a - b);
@@ -110,7 +110,7 @@ const FeatureGenerationStep: React.FC<FeatureGenerationStepProps> = ({
     setLoading(true);
     try {
       const response = await api.post(
-        `/features/projects/${project.id}/generate-features`, // Fixed: removed /api prefix
+        `/features/projects/${project.id}/generate-features`,
         {
           date_features: dateFeatures,
           numerical_features: numericalFeatures,
@@ -177,8 +177,9 @@ const FeatureGenerationStep: React.FC<FeatureGenerationStepProps> = ({
     },
   ];
 
-  const getSelectedNumbers = (type: string) => {
-    return numericalFeatures[type as keyof typeof numericalFeatures] as number[];
+  const getSelectedNumbers = (type: string): number[] => {
+    const value = numericalFeatures[type as keyof typeof numericalFeatures];
+    return Array.isArray(value) ? value : [];
   };
 
   const getRgbaColor = (color: string) => {

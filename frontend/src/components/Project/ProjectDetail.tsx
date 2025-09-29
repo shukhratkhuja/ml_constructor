@@ -18,15 +18,19 @@ import {
   ArrowLeftOutlined,
   DatabaseOutlined,
   SettingOutlined,
+  FileAddOutlined,
+  CompressOutlined,
   FunctionOutlined,
   ExperimentOutlined,
   CheckCircleOutlined,
   LoadingOutlined,
 } from '@ant-design/icons';
-import api from '../../config/axios';
+import axios from 'axios';
 
 import DataLoadingStep from './steps/DataLoadingStep';
 import ColumnMappingStep from './steps/ColumnMappingStep';
+import AdditionalFilesStep from './steps/AdditionalFilesStep';
+import AggregationStep from './steps/AggregationStep';
 import FeatureGenerationStep from './steps/FeatureGenerationStep';
 import ModelTrainingStep from './steps/ModelTrainingStep';
 
@@ -42,6 +46,8 @@ interface Project {
   date_column?: string;
   value_column?: string;
   product_column?: string;
+  aggregation_completed?: boolean;
+  features_generated?: boolean;
   test_ratio?: number;
   cv_folds?: number;
 }
@@ -50,26 +56,38 @@ const steps = [
   { 
     title: 'Data Loading', 
     icon: DatabaseOutlined,
-    description: 'Upload files or connect to database',
+    description: 'Upload main data file',
     color: '#8b5cf6'
   },
   { 
     title: 'Column Mapping', 
     icon: SettingOutlined,
-    description: 'Map your data columns',
+    description: 'Map main file columns',
     color: '#06b6d4'
+  },
+  { 
+    title: 'Additional Files', 
+    icon: FileAddOutlined,
+    description: 'Add extra data sources',
+    color: '#f59e0b'
+  },
+  { 
+    title: 'Data Aggregation', 
+    icon: CompressOutlined,
+    description: 'Aggregate to time period',
+    color: '#10b981'
   },
   { 
     title: 'Feature Generation', 
     icon: FunctionOutlined,
-    description: 'Create time series features',
-    color: '#f59e0b'
+    description: 'Create ML features',
+    color: '#ec4899'
   },
   { 
     title: 'Model Training', 
     icon: ExperimentOutlined,
     description: 'Train your ML model',
-    color: '#10b981'
+    color: '#f97316'
   },
 ];
 
@@ -83,33 +101,15 @@ const ProjectDetail: React.FC = () => {
   const navigate = useNavigate();
   const { projectId } = useParams<{ projectId: string }>();
 
-  // Add debugging
-  console.log('ProjectDetail rendering, projectId:', projectId);
-  console.log('Project state:', project);
-  console.log('Loading state:', loading);
-
   useEffect(() => {
-    console.log('ProjectDetail useEffect triggered');
     fetchProject();
-    
-    // Try to restore dataInfo from sessionStorage if it exists
-    const savedDataInfo = sessionStorage.getItem('dataInfo');
-    if (savedDataInfo && !dataInfo) {
-      try {
-        const parsedDataInfo = JSON.parse(savedDataInfo);
-        setDataInfo(parsedDataInfo);
-        console.log('Restored dataInfo from sessionStorage:', parsedDataInfo);
-      } catch (error) {
-        console.error('Failed to parse saved dataInfo:', error);
-      }
-    }
   }, [projectId]);
 
   const fetchProject = async () => {
     if (!projectId) return;
     
     try {
-      const response = await api.get(`/projects/${projectId}`);
+      const response = await axios.get(`/api/projects/${projectId}`);
       setProject(response.data);
       
       // Determine current step and completed steps based on project data
@@ -122,9 +122,16 @@ const ProjectDetail: React.FC = () => {
         if (response.data.date_column && response.data.value_column) {
           completed.push(1);
           current = 2;
-          if (response.data.date_features || response.data.numerical_features) {
-            completed.push(2);
-            current = 3;
+          // Step 2: Additional files (always allow to proceed even if no files added)
+          completed.push(2);
+          current = 3;
+          if (response.data.aggregation_completed) {
+            completed.push(3);
+            current = 4;
+            if (response.data.features_generated) {
+              completed.push(4);
+              current = 5;
+            }
           }
         }
       }
@@ -143,7 +150,7 @@ const ProjectDetail: React.FC = () => {
     if (!projectId) return;
     
     try {
-      const response = await api.put(`/projects/${projectId}`, updates);
+      const response = await axios.put(`/api/projects/${projectId}`, updates);
       setProject(response.data);
       return response.data;
     } catch (error) {
@@ -191,13 +198,29 @@ const ProjectDetail: React.FC = () => {
         );
       case 2:
         return (
+          <AdditionalFilesStep
+            project={project}
+            onComplete={handleNext}
+            updateProject={updateProject}
+          />
+        );
+      case 3:
+        return (
+          <AggregationStep
+            project={project}
+            onComplete={handleNext}
+            updateProject={updateProject}
+          />
+        );
+      case 4:
+        return (
           <FeatureGenerationStep
             project={project}
             onFeaturesGenerated={handleNext}
             updateProject={updateProject}
           />
         );
-      case 3:
+      case 5:
         return (
           <ModelTrainingStep
             project={project}
@@ -363,7 +386,7 @@ const ProjectDetail: React.FC = () => {
                     title={
                       <Text
                         style={{
-                          color: isActive ? '#8b5cf6' : isCompleted ? '#10b981' : 'rgba(255, 255, 255, 0.9)',
+                          color: isActive ? step.color : isCompleted ? '#10b981' : 'rgba(255, 255, 255, 0.9)',
                           fontWeight: isActive ? 600 : 500,
                           cursor: isClickable ? 'pointer' : 'default',
                         }}
@@ -387,7 +410,7 @@ const ProjectDetail: React.FC = () => {
                       isCompleted ? (
                         <CheckCircleOutlined style={{ color: '#10b981' }} />
                       ) : isActive ? (
-                        <LoadingOutlined style={{ color: '#8b5cf6' }} />
+                        <LoadingOutlined style={{ color: step.color }} />
                       ) : (
                         <IconComponent style={{ color: 'rgba(255, 255, 255, 0.5)' }} />
                       )

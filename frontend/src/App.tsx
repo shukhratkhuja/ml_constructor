@@ -59,7 +59,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
-  return token ? <Navigate to="/dashboard" /> : <>{children}</>;
+  return !token ? <>{children}</> : <Navigate to="/dashboard" />;
 }
 
 function MainApp() {
@@ -69,6 +69,7 @@ function MainApp() {
         <AuthProvider>
           <Router>
             <Routes>
+              {/* Public Routes */}
               <Route 
                 path="/login" 
                 element={
@@ -85,6 +86,8 @@ function MainApp() {
                   </PublicRoute>
                 } 
               />
+
+              {/* Protected Routes */}
               <Route 
                 path="/dashboard" 
                 element={
@@ -101,6 +104,8 @@ function MainApp() {
                   </ProtectedRoute>
                 } 
               />
+
+              {/* Default Route */}
               <Route path="/" element={<Navigate to="/dashboard" />} />
             </Routes>
           </Router>

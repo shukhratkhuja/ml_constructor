@@ -13,6 +13,7 @@ import {
   Divider,
 } from 'antd';
 import {
+  UserOutlined,
   LockOutlined,
   EyeInvisibleOutlined,
   EyeTwoTone,
